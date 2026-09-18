@@ -1,13 +1,3 @@
-; Auto-generated per-student PHP-FPM pool. Do not edit by hand — edit the
-; template in templates/php-fpm-pool.conf.template and re-run add-student.sh
-; if you need to change something for everyone.
-;
-; The key isolation property of this pool: PHP code for this student runs
-; AS this student (user/group below), not as www-data. That means a PHP
-; script has exactly the same filesystem access as the student would have
-; over SSH — nothing more. open_basedir is a second, belt-and-braces layer
-; on top of that OS-level boundary.
-
 [{{USERNAME}}]
 user = {{USERNAME}}
 group = {{USERNAME}}
@@ -17,35 +7,18 @@ listen.owner = {{WEB_GROUP}}
 listen.group = {{WEB_GROUP}}
 listen.mode = 0660
 
-; ondemand = zero workers, zero resource cost, while a student's site is idle
-; (most of the time, for most of ~30-150 students). Workers spawn on request
-; and die after process_idle_timeout. Tune max_children up if a class is
-; unusually active; each active worker costs a few MB of RAM.
 pm = ondemand
 pm.max_children = 4
 pm.process_idle_timeout = 15s
 pm.max_requests = 500
-
-; Defense-in-depth: even if a filesystem permission was somehow wrong, PHP
-; itself refuses to open anything outside these paths.
 php_admin_value[open_basedir] = "{{HOME_DIR}}/workshops:{{HOME_DIR}}/exams:{{HOME_DIR}}/assessments:/tmp"
-
-; Private per-student session storage (not inside a web-served folder).
 php_admin_value[session.save_path] = "{{HOME_DIR}}/.sessions"
-
-; Sensible defaults for coursework (Week 4 covers file uploads).
 php_admin_value[upload_max_filesize] = 20M
 php_admin_value[post_max_size] = 20M
 php_admin_value[memory_limit] = 128M
 php_admin_value[max_execution_time] = 30
-
-; Errors go to this student's own log, not the page — matches the good
-; practice the module teaches in weeks 9-10. Flip display_errors to On
-; here (or per-student) in the earlier weeks if you'd rather students see
-; errors inline while they're still learning.
 php_admin_value[display_errors] = Off
 php_admin_value[log_errors] = On
 php_admin_value[error_log] = "{{HOME_DIR}}/.sessions/php-error.log"
-
 catch_workers_output = yes
 decorate_workers_output = no

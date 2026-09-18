@@ -1,43 +1,26 @@
 <?php
-/**
- * register_handler.php — email-only registration. Derives a username from
- * the email, provisions (or resets) the account via add-student.sh through
- * a narrowly-scoped sudo rule, then emails the credentials.
- *
- * Security model, spelled out (see also add-student.sh and the sudoers
- * template):
- *   - www-data is NOT root, and can only sudo this one exact script
- *     (/etc/sudoers.d/5cs045-provisioning) — a bug here can create/reset
- *     student accounts, it cannot compromise the rest of the box.
- *   - the password is never written anywhere www-data can read on an
- *     ongoing basis (add-student.sh's credentials.txt stays 600, owned by
- *     the student, exactly as tested). www-data only ever sees a password
- *     in the one HTTP response from the sudo call that just generated it —
- *     the same moment it caused that generation — not via standing file
- *     access. It's parsed from add-student.sh's stdout and never persisted
- *     to disk from this side.
- *   - every value that reaches a shell goes through escapeshellarg().
- *   - resubmitting for an existing account is a deliberate, documented
- *     reset path (add-student.sh regenerates the password every run) —
- *     not an accidental side effect.
- */
 declare(strict_types=1);
+
+session_set_cookie_params([
+    'secure' => true,
+    'httponly' => true,
+    'samesite' => 'Strict',
+]);
 session_start();
 
 require __DIR__ . '/lib/smtp_mailer.php';
-// Loaded from OUTSIDE the web root on purpose (see setup/00-server-setup.sh)
-// — this holds the SMTP relay password, so it should never be reachable by
-// any possible nginx config, not just correctly denied by the current one.
 $smtp = require '/etc/5cs045/smtp_config.php';
 
 const ADD_STUDENT_SCRIPT = '/usr/local/sbin/5cs045/bin/add-student.sh';
 const LOG_FILE = '/var/log/5cs045-registration.log';
 const RATE_LIMIT_DIR = '/var/lib/5cs045-ratelimit';
-const RATE_LIMIT_SECONDS = 300; // one registration/reset per email per 5 minutes
+const LOCK_DIR = '/var/lib/5cs045-registration-locks';
+const REGISTRY_DIR = '/var/lib/5cs045-registrations';
+const RATE_LIMIT_SECONDS = 300;
 
 function respond_and_redirect(bool $ok, string $message): never {
     $_SESSION['register_result'] = ['ok' => $ok, 'message' => $message];
-    header('Location: register.php');
+    header('Location: register.php', true, 303);
     exit;
 }
 
@@ -46,7 +29,6 @@ function audit_log(string $line): void {
     @file_put_contents(LOG_FILE, sprintf("[%s] [%s] %s\n", date('c'), $ip, $line), FILE_APPEND | LOCK_EX);
 }
 
-/** Local-part of the email, sanitized into a safe Linux/MySQL username. Null if it can't produce a valid one. */
 function derive_username(string $email): ?string {
     $at = strrpos($email, '@');
     if ($at === false) return null;
@@ -55,119 +37,179 @@ function derive_username(string $email): ?string {
     $local = trim($local, '_');
     if ($local === '') return null;
     if (!preg_match('/^[a-z]/', $local)) {
-        $local = 's' . $local; // usernames must start with a letter — 's' matches the existing student-ID convention (s1234567)
+        $local = 's' . $local;
     }
     $local = substr($local, 0, 32);
     return preg_match('/^[a-z][a-z0-9_]{2,31}$/', $local) ? $local : null;
 }
 
-function rate_limited(string $email): bool {
-    $key = hash('sha256', strtolower($email));
-    $lockFile = RATE_LIMIT_DIR . '/' . $key;
-    if (is_file($lockFile) && (time() - (int) file_get_contents($lockFile)) < RATE_LIMIT_SECONDS) {
-        return true;
+function registration_key(string $email): string {
+    return hash('sha256', strtolower($email));
+}
+
+function already_registered(string $email): bool {
+    return is_file(REGISTRY_DIR . '/' . registration_key($email));
+}
+
+function mark_registered(string $email, string $username, string $status = 'complete'): void {
+    @mkdir(REGISTRY_DIR, 0700, true);
+    $path = REGISTRY_DIR . '/' . registration_key($email);
+    $content = json_encode([
+        'username' => $username,
+        'registered_at' => date(DATE_ATOM),
+        'status' => $status,
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($content === false || @file_put_contents($path, $content, LOCK_EX) === false) {
+        throw new RuntimeException('Could not record the registration.');
     }
+    @chmod($path, 0600);
+}
+
+function id_exists(string $username): bool {
+    exec('id ' . escapeshellarg($username) . ' >/dev/null 2>&1', $unused, $code);
+    return $code === 0;
+}
+
+function acquire_request_lock(string $email): ?string {
     @mkdir(RATE_LIMIT_DIR, 0700, true);
-    @file_put_contents($lockFile, (string) time());
-    return false;
+    @mkdir(LOCK_DIR, 0700, true);
+    $key = registration_key($email);
+    $rateFile = RATE_LIMIT_DIR . '/' . $key;
+    $lockPath = LOCK_DIR . '/' . $key;
+    $now = time();
+    if (is_file($rateFile)) {
+        $last = (int) @file_get_contents($rateFile);
+        if (($now - $last) < RATE_LIMIT_SECONDS) {
+            return null;
+        }
+    }
+    if (!@mkdir($lockPath, 0700)) {
+        return null;
+    }
+    if (@file_put_contents($rateFile, (string) $now, LOCK_EX) === false) {
+        @rmdir($lockPath);
+        return null;
+    }
+    @chmod($rateFile, 0600);
+    return $lockPath;
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    respond_and_redirect(false, 'Please use the form.');
+    respond_and_redirect(false, 'Please use the form to register.');
 }
 
-$email = trim((string)($_POST['email'] ?? ''));
+$csrf = (string) ($_POST['csrf_token'] ?? '');
+if (!hash_equals((string) ($_SESSION['register_csrf'] ?? ''), $csrf)) {
+    audit_log('REJECTED invalid CSRF token');
+    respond_and_redirect(false, 'The form expired. Please try again.');
+}
 
+$email = trim((string) ($_POST['email'] ?? ''));
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    respond_and_redirect(false, 'That doesn\'t look like a valid email address.');
+    respond_and_redirect(false, 'Please enter a valid college email.');
 }
-if (!empty($smtp['allowed_email_domain'])) {
+
+$allowedDomain = trim((string) ($smtp['allowed_email_domain'] ?? ''));
+if ($allowedDomain !== '') {
     $domain = substr($email, strrpos($email, '@') + 1);
-    if (strcasecmp($domain, $smtp['allowed_email_domain']) !== 0) {
+    if (strcasecmp($domain, $allowedDomain) !== 0) {
         audit_log("REJECTED wrong domain: {$email}");
-        respond_and_redirect(false, "Please use your @{$smtp['allowed_email_domain']} college email.");
+        respond_and_redirect(false, "Please use your @{$allowedDomain} college email.");
     }
 }
 
 $username = derive_username($email);
 if ($username === null) {
-    audit_log("REJECTED could not derive username from: {$email}");
-    respond_and_redirect(false, 'Could not derive a valid username from that email. Please contact your tutor.');
+    audit_log("REJECTED invalid username derived from {$email}");
+    respond_and_redirect(false, 'That email cannot be used for a server account. Please contact your tutor.');
 }
 
-if (rate_limited($email)) {
-    respond_and_redirect(false, 'A request for this email was already made in the last few minutes. Check your inbox (and spam folder), or wait a few minutes and try again.');
+if (already_registered($email)) {
+    respond_and_redirect(false, 'This email has already been registered. Please contact your tutor if you need a password reset.');
 }
 
-// --- Safe invocation: fixed script path (never user input), every argument
-// through escapeshellarg(), username re-validated here even though
-// derive_username() already constrains it — defense in depth, exactly like
-// the original design. ---
-$cmd = sprintf(
-    'sudo -n %s -u %s 2>&1',
-    escapeshellarg(ADD_STUDENT_SCRIPT),
-    escapeshellarg($username)
-);
-exec($cmd, $outputLines, $exitCode);
-$output = implode("\n", $outputLines);
-audit_log("provision username={$username} email={$email} exit={$exitCode}");
-
-if ($exitCode !== 0) {
-    audit_log("FAILURE detail: {$output}");
-    respond_and_redirect(false, 'Something went wrong creating your account. Please email your tutor — this has been logged for them to check.');
+if (id_exists($username)) {
+    respond_and_redirect(false, 'An account already exists for this student. Please contact your tutor.');
 }
 
-// Parse the password add-student.sh just printed. Deliberately not reading
-// it back from credentials.txt on disk — that file stays 600, owned by the
-// student, exactly as tested; www-data only ever sees this value in the
-// output of the sudo call that just generated it.
-if (!preg_match('/^Password:\s+(\S+)/m', $output, $m)) {
-    audit_log("FAILURE could not parse password from add-student.sh output: {$output}");
-    respond_and_redirect(false, 'Your account was created, but something went wrong retrieving your password. Please email your tutor.');
+$lockPath = acquire_request_lock($email);
+if ($lockPath === null) {
+    respond_and_redirect(false, 'Please wait a few minutes before trying this email again.');
 }
-$password = $m[1];
-$dbName = "student_{$username}";
-
-$body = <<<TXT
-Your 5CS045 server account is ready.
-
-Username: {$username}
-Database: {$dbName}
-Password: {$password}
-
-This password works for BOTH SSH/SCP and MySQL.
-
-Connect:
-  ssh {$username}@<server-address>
-  scp -r ./my-site {$username}@<server-address>:~/workshops/
-
-Your files go in one of three folders in your home directory —
-workshops/, exams/, assessments/ — and are visible at:
-  https://<server-address>/~{$username}/workshops/
-  https://<server-address>/~{$username}/exams/
-  https://<server-address>/~{$username}/assessments/
-
-Full setup and usage instructions: see the Server Access Guide on Canvas.
-
-If you didn't request this, you can ignore this email — no account
-information was disclosed anywhere except to this address.
-TXT;
 
 try {
-    $mailer = new SmtpMailer(
-        host: $smtp['host'], port: $smtp['port'],
-        username: $smtp['username'], password: $smtp['password'],
-        fromAddress: $smtp['from_address'], fromName: $smtp['from_name'],
-        useStartTls: $smtp['use_starttls'],
+    $cmd = sprintf(
+        'sudo -n %s -u %s 2>&1',
+        escapeshellarg(ADD_STUDENT_SCRIPT),
+        escapeshellarg($username)
     );
-    $mailer->send($email, 'Your 5CS045 server account', $body);
-    audit_log("emailed credentials to {$email} for {$username}");
-} catch (Throwable $e) {
-    audit_log("EMAIL SEND FAILED for {$username}: " . $e->getMessage());
-    respond_and_redirect(false,
-        "Your account ({$username}) was created, but we couldn't email your credentials " .
-        "(mail server error, logged for your tutor). Please contact your tutor directly to get your password."
-    );
-}
+    exec($cmd, $outputLines, $exitCode);
+    $output = implode("\n", $outputLines);
+    audit_log("provision username={$username} email={$email} exit={$exitCode}");
 
-respond_and_redirect(true, "Account ready — check {$email} for your username, database name, and password.");
+    if ($exitCode !== 0) {
+        audit_log("FAILURE detail: {$output}");
+        respond_and_redirect(false, 'Something went wrong. Please contact your tutor.');
+    }
+
+    if (!preg_match('/^Password:\s+(\S+)/m', $output, $m)) {
+        audit_log("FAILURE could not parse password for {$username}");
+        respond_and_redirect(false, 'Your account was created, but we could not prepare your email. Please contact your tutor.');
+    }
+
+    $password = $m[1];
+    $dbName = "student_{$username}";
+    $serverUrl = rtrim((string) ($smtp['server_url'] ?? ''), '/');
+    if ($serverUrl === '') {
+        throw new RuntimeException('server_url is not configured');
+    }
+    $website = $serverUrl . '/~' . $username . '/';
+
+    // Record a pending registration before sending mail. This prevents a second
+    // request from creating or resetting the same account while the first one is
+    // still being delivered. If mail fails, the marker is removed so the student
+    // can retry.
+    mark_registered($email, $username, 'pending');
+
+    $body = <<<TXT
+Your Server Credentials
+
+Welcome to the Server!
+
+Full Stack Development Module Server
+
+Here are your access details:
+-----------------------------
+Username: {$username}
+Password: {$password}
+Database: {$dbName}
+Website URL: {$website}
+
+Please keep this safe.
+
+If you did not request this account, please contact your tutor.
+TXT;
+
+    try {
+        $mailer = new SmtpMailer(
+            host: (string) $smtp['host'],
+            port: (int) $smtp['port'],
+            username: (string) $smtp['username'],
+            password: (string) $smtp['password'],
+            fromAddress: (string) $smtp['from_address'],
+            fromName: (string) $smtp['from_name'],
+            useStartTls: (bool) $smtp['use_starttls'],
+        );
+        $mailer->send($email, 'Your Server Credentials', $body);
+    } catch (Throwable $e) {
+        @unlink(REGISTRY_DIR . '/' . registration_key($email));
+        audit_log("EMAIL SEND FAILED for {$username}: " . $e->getMessage());
+        respond_and_redirect(false, 'Your account was created, but we could not send the email. Please contact your tutor for your password.');
+    }
+
+    mark_registered($email, $username, 'complete');
+    audit_log("registered username={$username} email={$email}");
+    respond_and_redirect(true, "Your account is ready. Check {$email} for your server details.");
+} finally {
+    @rmdir($lockPath);
+}
