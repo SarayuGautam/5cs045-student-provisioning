@@ -1,0 +1,9 @@
+# /etc/sudoers.d/5cs045-provisioning
+# Install with: visudo -cf this-file   (validate!) then copy to /etc/sudoers.d/
+# with mode 0440, owned root:root.
+#
+# www-data may run exactly this one script as root, nothing else. This is
+# the entire privilege boundary the registration form (register_handler.php)
+# depends on: a bug in the PHP form can misuse add-student.sh's own
+# arguments, but cannot run arbitrary commands as root.
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/5cs045/bin/add-student.sh
