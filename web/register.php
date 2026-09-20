@@ -21,159 +21,243 @@ unset($_SESSION['register_result']);
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Server Registration | Full Stack Development</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-    --green: #69be28;
-    --green-dark: #4f921d;
-    --ink: #1f2937;
+    --green: #72bf3d;
+    --green-dark: #5ca52c;
+    --green-soft: #edf8e7;
+    --ink: #252525;
     --muted: #6b7280;
-    --line: #e5e7eb;
+    --line: #e6e8eb;
     --surface: #ffffff;
-    --background: #f5f7f8;
+    --background: #f4f7f2;
+    --danger-bg: #fff4f4;
+    --danger-line: #f3c2c2;
+    --danger-text: #9f2626;
+    --success-line: #c3e7ad;
+    --success-text: #2f6f19;
 }
+
 * { box-sizing: border-box; }
+
+html, body { min-height: 100%; }
+
 body {
     margin: 0;
-    min-height: 100vh;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: linear-gradient(180deg, #f8fafb 0%, var(--background) 100%);
+    font-family: 'Poppins', sans-serif;
+    background:
+        radial-gradient(circle at top right, rgba(114, 191, 61, 0.12), transparent 28%),
+        var(--background);
     color: var(--ink);
-    display: grid;
-    place-items: center;
-    padding: 28px 16px;
-}
-.card {
-    width: min(100%, 460px);
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 20px;
-    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
-    padding: 34px;
-}
-.brand {
     display: flex;
     align-items: center;
-    gap: 14px;
-    margin-bottom: 24px;
+    justify-content: center;
+    padding: 32px 18px;
 }
-.brand-mark {
-    width: 64px;
-    height: 64px;
-    flex: 0 0 64px;
+
+.shell {
+    width: min(100%, 560px);
 }
-.brand-copy strong {
+
+.card {
+    background: var(--surface);
+    border: 1px solid rgba(30, 41, 59, 0.08);
+    border-radius: 24px;
+    box-shadow: 0 22px 60px rgba(24, 39, 28, 0.10);
+    overflow: hidden;
+}
+
+.logo-wrap {
+    padding: 22px 22px 10px;
+    background: #fff;
+}
+
+.logo {
     display: block;
-    font-size: 14px;
-    letter-spacing: 0.08em;
-    line-height: 1.25;
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
 }
-.brand-copy span {
-    display: block;
-    margin-top: 5px;
+
+.content {
+    padding: 28px 34px 34px;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: var(--green-soft);
+    color: var(--green-dark);
     font-size: 12px;
-    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin-bottom: 14px;
 }
+
 h1 {
-    font-size: 28px;
-    line-height: 1.2;
-    margin: 0 0 10px;
+    margin: 0;
+    font-size: 30px;
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: -0.02em;
 }
+
 .intro {
-    margin: 0 0 26px;
+    margin: 10px 0 24px;
     color: var(--muted);
+    font-size: 14px;
+    line-height: 1.75;
+}
+
+.message {
+    border-radius: 14px;
+    padding: 13px 15px;
+    margin-bottom: 20px;
+    font-size: 13px;
     line-height: 1.6;
 }
-label {
-    display: block;
-    font-size: 14px;
-    font-weight: 650;
-    margin-bottom: 8px;
+
+.message.ok {
+    background: var(--green-soft);
+    border: 1px solid var(--success-line);
+    color: var(--success-text);
 }
+
+.message.err {
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-line);
+    color: var(--danger-text);
+}
+
+.field-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.input-wrap {
+    position: relative;
+}
+
 input[type="email"] {
     width: 100%;
-    border: 1px solid #d1d5db;
-    border-radius: 12px;
-    padding: 13px 14px;
-    font: inherit;
+    height: 52px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 0 16px;
+    font: 500 14px 'Poppins', sans-serif;
     color: var(--ink);
     background: #fff;
     outline: none;
     transition: border-color .15s ease, box-shadow .15s ease;
 }
+
+input[type="email"]::placeholder {
+    color: #a4a8ae;
+    font-weight: 400;
+}
+
 input[type="email"]:focus {
     border-color: var(--green);
-    box-shadow: 0 0 0 4px rgba(105, 190, 40, 0.14);
+    box-shadow: 0 0 0 4px rgba(114, 191, 61, 0.14);
 }
+
 button {
     width: 100%;
-    margin-top: 18px;
+    height: 52px;
+    margin-top: 16px;
     border: 0;
-    border-radius: 12px;
+    border-radius: 14px;
     background: var(--green);
     color: #fff;
-    padding: 13px 16px;
-    font: inherit;
-    font-weight: 700;
+    padding: 0 16px;
+    font: 600 14px 'Poppins', sans-serif;
     cursor: pointer;
-    transition: background .15s ease, transform .15s ease;
+    transition: background .15s ease, transform .15s ease, box-shadow .15s ease;
+    box-shadow: 0 10px 24px rgba(114, 191, 61, 0.20);
 }
-button:hover { background: var(--green-dark); }
-button:active { transform: translateY(1px); }
+
+button:hover {
+    background: var(--green-dark);
+    box-shadow: 0 12px 28px rgba(92, 165, 44, 0.22);
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
 .note {
-    margin-top: 14px;
-    font-size: 12px;
+    margin: 16px 0 0;
     color: var(--muted);
-    line-height: 1.5;
-}
-.message {
-    border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 18px;
-    font-size: 14px;
-    line-height: 1.5;
-}
-.message.ok { background: #effbea; border: 1px solid #b9e59b; color: #245414; }
-.message.err { background: #fff4f4; border: 1px solid #f2b8b8; color: #8d1e1e; }
-.footer {
+    font-size: 12px;
+    line-height: 1.65;
     text-align: center;
+}
+
+.footer {
     margin-top: 22px;
-    color: #9ca3af;
+    color: #9aa0a7;
     font-size: 11px;
+    text-align: center;
+}
+
+@media (max-width: 520px) {
+    body { padding: 18px 12px; }
+    .logo-wrap { padding: 14px 14px 4px; }
+    .content { padding: 22px 20px 24px; }
+    h1 { font-size: 25px; }
 }
 </style>
 </head>
 <body>
-<main class="card">
-    <div class="brand">
-        <svg class="brand-mark" viewBox="0 0 64 64" role="img" aria-label="Herald College Kathmandu">
-            <rect x="1" y="1" width="62" height="62" rx="10" fill="#69be28"/>
-            <path d="M15 45V19h7v8h20v-8h7v26h-7V34H22v11h-7Z" fill="#fff"/>
-            <path d="M27 19h7v26h-7z" fill="#fff"/>
-        </svg>
-        <div class="brand-copy">
-            <strong>HERALD COLLEGE KATHMANDU</strong>
-            <span>Full Stack Development Module Server</span>
+<div class="shell">
+    <main class="card">
+        <div class="logo-wrap">
+            <img class="logo" src="assets/herald-college-logo.png" alt="Herald College Kathmandu and Islington College logo">
         </div>
-    </div>
 
-    <h1>Create your server account</h1>
-    <p class="intro">Use your college email. Your server details will be sent to you by email.</p>
+        <div class="content">
+            <div class="badge">Full Stack Development Module Server</div>
 
-    <?php if ($message !== null): ?>
-        <div class="message <?= $message['ok'] ? 'ok' : 'err' ?>">
-            <?= htmlspecialchars($message['message'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+            <h1>Register for your server account</h1>
+            <p class="intro">Enter your college email address. Your server username, password, database and website link will be sent to you by email.</p>
+
+            <?php if ($message !== null): ?>
+                <div class="message <?= $message['ok'] ? 'ok' : 'err' ?>">
+                    <?= htmlspecialchars($message['message'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="post" action="register_handler.php" autocomplete="on">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['register_csrf'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+
+                <label class="field-label" for="email">College email</label>
+                <div class="input-wrap">
+                    <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        required
+                        maxlength="254"
+                        autocomplete="email"
+                        placeholder="yourname@heraldcollege.edu.np"
+                        autofocus
+                    >
+                </div>
+
+                <button type="submit">Register</button>
+            </form>
+
+            <p class="note">You can register only once with the same email address. Contact your tutor if you need help with an existing account.</p>
+            <div class="footer">Herald College Kathmandu</div>
         </div>
-    <?php endif; ?>
-
-    <form method="post" action="register_handler.php" autocomplete="email">
-        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['register_csrf'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
-        <label for="email">College email</label>
-        <input id="email" name="email" type="email" required maxlength="254" placeholder="yourname@heraldcollege.edu.np" autofocus>
-        <button type="submit">Create account</button>
-    </form>
-
-    <p class="note">Use your college email only. Contact your tutor if you need help with an existing account.</p>
-    <div class="footer">Full Stack Development Module</div>
-</main>
+    </main>
+</div>
 </body>
 </html>
