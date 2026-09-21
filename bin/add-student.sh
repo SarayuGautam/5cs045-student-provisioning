@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Creates one student account: Linux user, three web folders, database and PHP pool.
 #
-# Usage: sudo add-student.sh -u sarayu_gautam [-n "Full Name"] [-e email]
+# Usage: sudo add-student.sh -u sarayu_gautam [-n "Full Name"] [-e email] [-d]
 #
 # -e records the email so the registration page will not create a second account for it.
+# -d reloads PHP 10 seconds later instead of straight away. The registration page uses it,
+#    because reloading PHP would otherwise cut off the page that is running this script.
 # The script prints the password once. It is also saved in the student's credentials.txt.
 # The same password works for SSH, SCP and MySQL.
 set -euo pipefail
@@ -21,12 +23,14 @@ USERNAME_RE='^[a-z][a-z0-9_]{2,31}$'
 USERNAME=""
 FULLNAME=""
 EMAIL=""
-while getopts "u:n:e:h" opt; do
+DELAY_RELOAD=0
+while getopts "u:n:e:dh" opt; do
   case "$opt" in
     u) USERNAME="$OPTARG" ;;
     n) FULLNAME="$OPTARG" ;;
     e) EMAIL="$OPTARG" ;;
-    h) echo "Usage: $0 -u <username> [-n \"Full Name\"] [-e email]"; exit 0 ;;
+    d) DELAY_RELOAD=1 ;;
+    h) echo "Usage: $0 -u <username> [-n \"Full Name\"] [-e email] [-d]"; exit 0 ;;
     *) exit 1 ;;
   esac
 done
@@ -111,7 +115,12 @@ sed \
   -e "s#{{WEB_GROUP}}#${WEB_GROUP}#g" \
   "$POOL_TEMPLATE" > "${FPM_POOL_DIR}/${USERNAME}.conf"
 php-fpm${PHP_VERSION} -t >/dev/null 2>&1 || die "the PHP pool config is invalid, see: php-fpm${PHP_VERSION} -t"
-systemctl reload "php${PHP_VERSION}-fpm"
+if [[ "$DELAY_RELOAD" -eq 1 ]]; then
+  systemd-run --quiet --collect --on-active=10s systemctl reload "php${PHP_VERSION}-fpm" >/dev/null 2>&1 \
+    || (setsid bash -c "sleep 10; systemctl reload php${PHP_VERSION}-fpm" >/dev/null 2>&1 </dev/null &)
+else
+  systemctl reload "php${PHP_VERSION}-fpm"
+fi
 
 # Remember the email so the registration page rejects it
 if [[ -n "$EMAIL" ]]; then

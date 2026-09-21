@@ -122,7 +122,7 @@ if ($lockPath === null) {
 
 try {
     $cmd = sprintf(
-        'sudo -n %s -u %s 2>&1',
+        'sudo -n %s -d -u %s 2>&1',
         escapeshellarg(ADD_STUDENT_SCRIPT),
         escapeshellarg($username)
     );

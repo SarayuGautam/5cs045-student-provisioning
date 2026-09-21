@@ -23,6 +23,7 @@ The username comes from the email. `sarayu.gautam@heraldcollege.edu.np` becomes 
 1. The student opens `https://<server>/register.php` and types their college email.
 2. The server creates the account and emails them the username, password, database name and the three website addresses.
 3. Each email can register only once. A second try is refused.
+4. The new student's website starts working about 10 seconds after registration.
 
 Students cannot reset their own password. You do that (see "Everyday tasks").
 
