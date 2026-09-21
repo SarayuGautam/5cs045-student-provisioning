@@ -88,7 +88,12 @@ chown -R www-data:www-data /var/www/html
 
 echo "==> Deploying SMTP config outside web root"
 mkdir -p /etc/5cs045
-cp "${REPO_ROOT}/web/smtp_config.php" /etc/5cs045/smtp_config.php
+if [[ ! -f /etc/5cs045/smtp_config.php ]]; then
+  cp "${REPO_ROOT}/web/smtp_config.example.php" /etc/5cs045/smtp_config.php
+  echo "    Created /etc/5cs045/smtp_config.php from the template - edit it with the real SMTP values."
+else
+  echo "    /etc/5cs045/smtp_config.php already exists - leaving it untouched."
+fi
 chown root:www-data /etc/5cs045/smtp_config.php
 chmod 640 /etc/5cs045/smtp_config.php
 

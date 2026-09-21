@@ -81,7 +81,7 @@ allowed_email_domain
 server_url
 ```
 
-For the temporary server test, the repository includes the guessed Herald values. Keep the real password only on the server. Do not commit it.
+The repository only contains a template, `web/smtp_config.example.php`, with a placeholder password. Setup copies it to `/etc/5cs045/smtp_config.php` once; after that, edit only the copy on the server. The real password must never be committed. `.gitignore` blocks `smtp_config.php`.
 
 Test one email with:
 
@@ -198,6 +198,7 @@ bin/remove-student.sh             Remove a student
 bin/list-students.sh              List students
 web/register.php                  Public registration page
 web/register_handler.php          Registration backend
+web/smtp_config.example.php       SMTP settings template (real file lives in /etc/5cs045/)
 test/smoke-test.sh                Security and isolation test
 test/smtp-test.php                Single SMTP test
 ```

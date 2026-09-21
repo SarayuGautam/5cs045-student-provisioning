@@ -1,0 +1,13 @@
+# Never commit real secrets or student data
+web/smtp_config.php
+smtp_config.php
+!web/smtp_config.example.php
+*.htpasswd*
+credentials.txt
+
+# macOS
+.DS_Store
+
+# Demo portfolio
+demo-student-portfolio-blade/vendor/
+demo-student-portfolio-blade/config.php
