@@ -1,20 +1,23 @@
-# Demo student portfolio (Blade)
+# Demo student portfolio
 
-A small PHP + MySQL project for testing your student server account. Features: CRUD for projects, PDO prepared statements, output escaping (Blade `{{ }}`), server-side validation, CSRF tokens, Fetch API search, session login, BladeOne templates.
+A small PHP and MySQL website for trying out a student account. You can add, edit, delete and search projects. It has a login, and it uses prepared statements, escaped output, form checks, CSRF tokens and Blade templates.
 
-## Deploy (run on the server over SSH)
+## Put it on the server
+
+From your laptop, in the folder that contains this project:
 
 ```bash
-cd ~/assessments
-cp -r /path/to/demo-student-portfolio-blade portfolio   # or scp it up
-cd portfolio
+scp -r demo-student-portfolio-blade <username>@<server>:~/assessments/portfolio
+ssh <username>@<server>
+cd ~/assessments/portfolio
 composer install --no-dev
 cp config.example.php config.php
-nano config.php                     # your username, password, student_<username>
+nano config.php
 mysql -u <username> -p student_<username> < schema.sql
-chmod 700 cache
 ```
 
-Open `https://<server>/~<username>/assessments/portfolio/register.php`, create a user, and log in.
+In `config.php` set your username, your server password and `student_<username>` as the database.
 
-`config.php`, `vendor/` and `cache/` are git-ignored. Never commit `config.php`.
+Then open `https://<server>/~<username>/assessments/portfolio/register.php`, create a user and log in.
+
+Never commit `config.php`. It holds your password.

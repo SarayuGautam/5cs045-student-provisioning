@@ -1,21 +1,14 @@
 #!/usr/bin/env bash
+# Removes one student: Linux account, home folder, database and PHP pool.
+# The home folder is saved to /srv/students-archive first, unless you add --no-backup.
+# The student's email is also forgotten, so they can register again.
 #
-# remove-student.sh — cleanly deprovision one student
-#
-# Removes the Linux user + home directory, the MariaDB database + user, and
-# the PHP-FPM pool. By default it backs up the home directory to
-# /srv/students-archive/<username>-<date>.tar.gz first (handy at end of
-# term, or if a student is removed by mistake) — pass --no-backup to skip.
-#
-# Usage:
-#   sudo ./remove-student.sh -u jbloggs21 [--no-backup]
-#
+# Usage: sudo remove-student.sh -u sarayu_gautam [--no-backup]
 set -euo pipefail
 
 PHP_VERSION="8.3"
-FPM_POOL_DIR="/etc/php/${PHP_VERSION}/fpm/pool.d"
-FPM_SOCK_DIR="/run/php"
 ARCHIVE_DIR="/srv/students-archive"
+REGISTRY_DIR="/var/lib/5cs045-registrations"
 USERNAME_RE='^[a-z][a-z0-9_]{2,31}$'
 
 USERNAME=""
@@ -29,50 +22,33 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-log() { echo "[$(date -Is)] $*" >&2; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-[[ $EUID -eq 0 ]] || die "must be run as root (use sudo)"
-[[ -n "$USERNAME" ]] || die "-u <username> is required"
-[[ "$USERNAME" =~ $USERNAME_RE ]] || die "username '$USERNAME' doesn't look valid"
+[[ $EUID -eq 0 ]] || die "run this with sudo"
+[[ "$USERNAME" =~ $USERNAME_RE ]] || die "give a valid username with -u"
 id "$USERNAME" &>/dev/null || die "no such user: $USERNAME"
 
-HOME_DIR=$(getent passwd "$USERNAME" | cut -d: -f6)
-[[ "$HOME_DIR" == /srv/students/* ]] || die "refusing to act — $USERNAME's home ($HOME_DIR) isn't under /srv/students/. This looks like it might not be a student account created by add-student.sh."
+HOME_DIR="$(getent passwd "$USERNAME" | cut -d: -f6)"
+[[ "$HOME_DIR" == /srv/students/* ]] || die "$USERNAME is not a student account (home is $HOME_DIR)"
 
-log "=== removing ${USERNAME} (home: ${HOME_DIR}) ==="
-
-if [[ "$DO_BACKUP" -eq 1 && -d "$HOME_DIR" ]]; then
+if [[ "$DO_BACKUP" -eq 1 ]]; then
   mkdir -p "$ARCHIVE_DIR"
   ARCHIVE_FILE="${ARCHIVE_DIR}/${USERNAME}-$(date +%Y%m%d-%H%M%S).tar.gz"
   tar -czf "$ARCHIVE_FILE" -C "$(dirname "$HOME_DIR")" "$(basename "$HOME_DIR")"
-  log "backed up home directory to ${ARCHIVE_FILE}"
+  echo "Backup saved: ${ARCHIVE_FILE}"
 fi
 
-# FPM pool first, so no in-flight request is mid-way through using the
-# account while the rest of the teardown happens
-POOL_FILE="${FPM_POOL_DIR}/${USERNAME}.conf"
-if [[ -f "$POOL_FILE" ]]; then
-  rm -f "$POOL_FILE"
-  if command -v systemctl &>/dev/null && systemctl is-system-running &>/dev/null; then
-    systemctl reload "php${PHP_VERSION}-fpm"
-  else
-    log "NOTE: systemd not available in this shell — reload php${PHP_VERSION}-fpm manually"
-  fi
-  log "removed FPM pool"
-fi
-rm -f "${FPM_SOCK_DIR}/php${PHP_VERSION}-fpm-${USERNAME}.sock"
+rm -f "/etc/php/${PHP_VERSION}/fpm/pool.d/${USERNAME}.conf" "/run/php/php${PHP_VERSION}-fpm-${USERNAME}.sock"
+systemctl reload "php${PHP_VERSION}-fpm"
 
-# Database
-DB_NAME="student_${USERNAME}"
-mysql -e "DROP DATABASE IF EXISTS \`${DB_NAME}\`; DROP USER IF EXISTS '${USERNAME}'@'localhost'; FLUSH PRIVILEGES;"
-log "dropped database ${DB_NAME} and MySQL user ${USERNAME}@localhost"
+mysql -e "DROP DATABASE IF EXISTS \`student_${USERNAME}\`; DROP USER IF EXISTS '${USERNAME}'@'localhost'; FLUSH PRIVILEGES;"
 
-# Linux account + home directory. Kill any lingering processes/sessions first
-# (userdel refuses if the user is logged in or has running processes).
 pkill -u "$USERNAME" 2>/dev/null || true
 sleep 1
 userdel -r "$USERNAME" 2>&1 | grep -v "mail spool" || true
-log "removed linux user and home directory"
 
-log "=== ${USERNAME} fully removed ==="
+if [[ -d "$REGISTRY_DIR" ]]; then
+  grep -l "\"username\":\"${USERNAME}\"" "$REGISTRY_DIR"/* 2>/dev/null | xargs -r rm -f
+fi
+
+echo "${USERNAME} removed."

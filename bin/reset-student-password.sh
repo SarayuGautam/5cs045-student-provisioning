@@ -1,60 +1,46 @@
 #!/usr/bin/env bash
+# Gives a student a new password (SSH, SCP and MySQL) and prints it once.
+#
+# Usage: sudo reset-student-password.sh -u sarayu_gautam
 set -euo pipefail
-
-STUDENT_ROOT="/srv/students"
-PHP_VERSION="8.3"
-LOG_FILE="/var/log/5cs045-provisioning.log"
-USERNAME_RE='^[a-z][a-z0-9_]{2,31}$'
-
-usage() {
-  echo "Usage: $0 -u <username>"
-}
-log() { echo "[$(date -Is)] $*" | tee -a "$LOG_FILE" >&2; }
-die() { echo "ERROR: $*" >&2; exit 1; }
 
 USERNAME=""
 while getopts "u:h" opt; do
   case "$opt" in
     u) USERNAME="$OPTARG" ;;
-    h) usage; exit 0 ;;
-    *) usage; exit 1 ;;
+    h) echo "Usage: $0 -u <username>"; exit 0 ;;
+    *) exit 1 ;;
   esac
 done
 
-[[ $EUID -eq 0 ]] || die "must be run as root"
-[[ -n "$USERNAME" ]] || die "-u <username> is required"
-[[ "$USERNAME" =~ $USERNAME_RE ]] || die "invalid username"
-id "$USERNAME" >/dev/null 2>&1 || die "student '$USERNAME' does not exist"
+[[ $EUID -eq 0 ]] || { echo "ERROR: run this with sudo" >&2; exit 1; }
+[[ "$USERNAME" =~ ^[a-z][a-z0-9_]{2,31}$ ]] || { echo "ERROR: give a valid username with -u" >&2; exit 1; }
+id "$USERNAME" >/dev/null 2>&1 || { echo "ERROR: no such user: $USERNAME" >&2; exit 1; }
 
-HOME_DIR="${STUDENT_ROOT}/${USERNAME}"
-CRED_FILE="${HOME_DIR}/credentials.txt"
+HOME_DIR="/srv/students/${USERNAME}"
 DB_NAME="student_${USERNAME}"
 
 PASSWORD_RAW="$(openssl rand -base64 48 | tr -dc 'A-HJ-NP-Za-km-z2-9')"
 PASSWORD="${PASSWORD_RAW:0:14}"
-[[ ${#PASSWORD} -eq 14 ]] || die "could not generate a password"
+[[ ${#PASSWORD} -eq 14 ]] || { echo "ERROR: could not generate a password" >&2; exit 1; }
 
 echo "${USERNAME}:${PASSWORD}" | chpasswd
 mysql <<-SQL
-ALTER USER '${USERNAME}'@'localhost' IDENTIFIED BY '${PASSWORD}';
-GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${USERNAME}'@'localhost';
-FLUSH PRIVILEGES;
+	ALTER USER '${USERNAME}'@'localhost' IDENTIFIED BY '${PASSWORD}';
+	FLUSH PRIVILEGES;
 SQL
 
-cat > "$CRED_FILE" <<-EOF2
-# 5CS045 server credentials for ${USERNAME} - keep this private.
-USERNAME=${USERNAME}
-PASSWORD=${PASSWORD}
-DB_HOST=localhost
-DB_NAME=${DB_NAME}
-EOF2
-chown "${USERNAME}:${USERNAME}" "$CRED_FILE"
-chmod 600 "$CRED_FILE"
+cat > "${HOME_DIR}/credentials.txt" <<-EOF
+	# Server login for ${USERNAME}. Keep this private.
+	USERNAME=${USERNAME}
+	PASSWORD=${PASSWORD}
+	DB_HOST=localhost
+	DB_NAME=${DB_NAME}
+	EOF
+chown "${USERNAME}:${USERNAME}" "${HOME_DIR}/credentials.txt"
+chmod 600 "${HOME_DIR}/credentials.txt"
 
-log "password reset for ${USERNAME}"
-echo ""
 echo "Student:  ${USERNAME}"
 echo "Password: ${PASSWORD}"
-echo "Database: ${DB_NAME}"
 echo ""
-echo "Send this password to the student using the approved communication method."
+echo "To email it to the student: sudo php /usr/local/sbin/5cs045/bin/resend-credentials.php <their email>"

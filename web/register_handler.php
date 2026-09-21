@@ -9,6 +9,7 @@ session_set_cookie_params([
 session_start();
 
 require __DIR__ . '/lib/smtp_mailer.php';
+require __DIR__ . '/lib/credentials.php';
 $smtp = require '/etc/5cs045/smtp_config.php';
 
 const ADD_STUDENT_SCRIPT = '/usr/local/sbin/5cs045/bin/add-student.sh';
@@ -27,24 +28,6 @@ function respond_and_redirect(bool $ok, string $message): never {
 function audit_log(string $line): void {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     @file_put_contents(LOG_FILE, sprintf("[%s] [%s] %s\n", date('c'), $ip, $line), FILE_APPEND | LOCK_EX);
-}
-
-function derive_username(string $email): ?string {
-    $at = strrpos($email, '@');
-    if ($at === false) return null;
-    $local = strtolower(substr($email, 0, $at));
-    $local = preg_replace('/[^a-z0-9]+/', '_', $local);
-    $local = trim($local, '_');
-    if ($local === '') return null;
-    if (!preg_match('/^[a-z]/', $local)) {
-        $local = 's' . $local;
-    }
-    $local = substr($local, 0, 32);
-    return preg_match('/^[a-z][a-z0-9_]{2,31}$/', $local) ? $local : null;
-}
-
-function registration_key(string $email): string {
-    return hash('sha256', strtolower($email));
 }
 
 function already_registered(string $email): bool {
@@ -158,37 +141,15 @@ try {
     }
 
     $password = $m[1];
-    $dbName = "student_{$username}";
-    $serverUrl = rtrim((string) ($smtp['server_url'] ?? ''), '/');
+    $serverUrl = (string) ($smtp['server_url'] ?? '');
     if ($serverUrl === '') {
         throw new RuntimeException('server_url is not configured');
     }
-    $website = $serverUrl . '/~' . $username . '/';
 
-    // Record a pending registration before sending mail. This prevents a second
-    // request from creating or resetting the same account while the first one is
-    // still being delivered. If mail fails, the marker is removed so the student
-    // can retry.
+    // Mark the email as taken before sending, so a second click cannot create it again.
     mark_registered($email, $username, 'pending');
 
-    $body = <<<TXT
-Your Server Credentials
-
-Welcome to the Server!
-
-Full Stack Development Module Server
-
-Here are your access details:
------------------------------
-Username: {$username}
-Password: {$password}
-Database: {$dbName}
-Website URL: {$website}
-
-Please keep this safe.
-
-If you did not request this account, please contact your tutor.
-TXT;
+    $body = credentials_email_body($username, $password, $serverUrl);
 
     try {
         $mailer = new SmtpMailer(

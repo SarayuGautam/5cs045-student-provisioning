@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One-time bootstrap for the 5CS045 student server.
-# Run once as root on a fresh Ubuntu 24.04 LTS VM.
+# First-time setup of the 5CS045 student server.
+# Run once, as root, on a fresh Ubuntu 24.04 VM. Do not run it again on a working server
+# (use update-server.sh instead).
 
 [[ $EUID -eq 0 ]] || { echo "run as root"; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,12 +37,9 @@ chmod 700 /srv/students-archive
 
 echo "==> Deploying provisioning tools"
 mkdir -p "${DEPLOY_ROOT}/bin" "${DEPLOY_ROOT}/templates"
-cp "${REPO_ROOT}/bin/add-student.sh" "${DEPLOY_ROOT}/bin/"
-cp "${REPO_ROOT}/bin/remove-student.sh" "${DEPLOY_ROOT}/bin/"
-cp "${REPO_ROOT}/bin/list-students.sh" "${DEPLOY_ROOT}/bin/" 2>/dev/null || true
-cp "${REPO_ROOT}/bin/reset-student-password.sh" "${DEPLOY_ROOT}/bin/"
+cp "${REPO_ROOT}"/bin/* "${DEPLOY_ROOT}/bin/"
 cp "${REPO_ROOT}/templates/php-fpm-pool.conf.template" "${DEPLOY_ROOT}/templates/"
-chmod +x "${DEPLOY_ROOT}"/bin/*.sh
+chmod 750 "${DEPLOY_ROOT}"/bin/*
 chown -R root:root "${DEPLOY_ROOT}"
 chmod -R go-w "${DEPLOY_ROOT}"
 
@@ -83,7 +81,7 @@ visudo -c
 echo "==> Deploying public registration form"
 mkdir -p /var/www/html/lib
 cp "${REPO_ROOT}/web/register.php" "${REPO_ROOT}/web/register_handler.php" /var/www/html/
-cp "${REPO_ROOT}/web/lib/smtp_mailer.php" /var/www/html/lib/
+cp "${REPO_ROOT}"/web/lib/*.php /var/www/html/lib/
 chown -R www-data:www-data /var/www/html
 
 echo "==> Deploying SMTP config outside web root"
@@ -127,8 +125,8 @@ echo ""
 echo " Public registration: https://<server>/register.php"
 echo " phpMyAdmin: https://<server>/phpmyadmin/"
 echo " SMTP config: /etc/5cs045/smtp_config.php"
-echo " Password reset: /usr/local/sbin/5cs045/bin/reset-student-password.sh"
+echo " Admin scripts: /usr/local/sbin/5cs045/bin/"
 echo ""
-echo " Next: run mysql_secure_installation, confirm SMTP details," 
-echo " run test/smoke-test.sh, then test one real registration."
+echo " Next: run mysql_secure_installation, put the real SMTP details in"
+echo " /etc/5cs045/smtp_config.php, run test/smoke-test.sh, then try one registration."
 echo "============================================================"

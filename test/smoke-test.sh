@@ -80,7 +80,7 @@ chown -R smoketest_a:smoketest_a /srv/students/smoketest_a/assessments/.git 2>/d
 check_code "$BASE_URL/~smoketest_a/assessments/.git/config" "404" ".git metadata is not servable over HTTPS"
 check_code "$BASE_URL/smtp_config.php" "404" "smtp_config.php is not servable over HTTPS"
 
-# The clean student URL redirects to the assessments area used by the demo/full-site assignment.
+
 ROOT_CODE="$(curl -k -s -o /dev/null -w '%{http_code}' "$BASE_URL/~smoketest_a/" 2>/dev/null)"
 [[ "$ROOT_CODE" == "302" ]] && ok "student root URL redirects to the assessments area" || bad "student root URL did not redirect (got HTTP $ROOT_CODE)"
 

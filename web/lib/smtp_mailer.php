@@ -11,28 +11,20 @@ final class SmtpMailer {
         private string $fromName = '5CS045 Student Server',
         private bool $useStartTls = true,
         private int $timeoutSeconds = 15,
-        private ?string $testCaFile = null,
     ) {}
-
-    private function buildStreamContext() {
-        $opts = ['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]];
-        if ($this->testCaFile !== null) {
-            $opts['ssl']['cafile'] = $this->testCaFile;
-        }
-        return stream_context_create($opts);
-    }
 
     public function send(string $toAddress, string $subject, string $body): void {
         $sock = @stream_socket_client(
             "tcp://{$this->host}:{$this->port}", $errno, $errstr,
-            $this->timeoutSeconds, STREAM_CLIENT_CONNECT, $this->buildStreamContext()
+            $this->timeoutSeconds, STREAM_CLIENT_CONNECT,
+            stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true]])
         );
         if ($sock === false) {
             throw new RuntimeException("Could not connect to {$this->host}:{$this->port} - {$errstr} ({$errno})");
         }
         stream_set_timeout($sock, $this->timeoutSeconds);
         try {
-            $this->expect($sock, 220, 'connect');
+            $this->readResponse($sock, 220, 'connect');
             $this->command($sock, 'EHLO 5cs045-student-server', 250);
             if ($this->useStartTls) {
                 $this->command($sock, 'STARTTLS', 220);
@@ -71,10 +63,6 @@ final class SmtpMailer {
     private function command($sock, string $line, int $expectCode): string {
         fwrite($sock, $line . "\r\n");
         return $this->readResponse($sock, $expectCode, $line);
-    }
-
-    private function expect($sock, int $expectCode, string $context): string {
-        return $this->readResponse($sock, $expectCode, $context);
     }
 
     private function readResponse($sock, int $expectCode, string $context): string {

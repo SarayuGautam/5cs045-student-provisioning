@@ -1,212 +1,248 @@
 # 5CS045 Student Server
 
-A simple provisioning system for the Full Stack Development Module. It creates isolated Linux accounts, MySQL databases, PHP-FPM pools, and student web folders.
+A small server for the Full Stack Development module. Each student gets their own login, website folders and database. Students register themselves on a web page, or you can create accounts by hand.
 
-## Student workflow
+Every command below is run on the server, over SSH, unless it says otherwise.
 
-1. Open `https://<server>/register.php`.
-2. Enter a college email. No login is required.
-3. The server creates the account once and emails the username, password, database name, and website URL.
-4. The student uses the same password for SSH, SCP, and MySQL.
-5. Students cannot reset their own server password. Tutor/admin resets it from the server.
+## What a student gets
 
-A second registration with the same email is rejected.
+- A login (username and password). The same password works for SSH, SCP and MySQL.
+- Three website folders: `workshops`, `exams` and `assessments`.
+- One database, named `student_<username>`.
+- A website at `https://<server>/~<username>/`. This address forwards to the `assessments` folder.
 
-## What each student gets
+Students cannot see or change each other's files. Their PHP code runs as their own user.
 
-```text
-/srv/students/<username>/
-├── workshops/
-├── exams/
-├── assessments/
-├── .ssh/
-├── .sessions/
-└── credentials.txt
-```
+The username comes from the email. `sarayu.gautam@heraldcollege.edu.np` becomes `sarayu_gautam`.
 
-Student PHP runs as that student. Students cannot read or write another student's files. New content in the three work folders automatically gets web read access without manual `chmod`.
+## How registration works
 
-## 1. Fresh Ubuntu 24.04 setup
+1. The student opens `https://<server>/register.php` and types their college email.
+2. The server creates the account and emails them the username, password, database name and website address.
+3. Each email can register only once. A second try is refused.
 
-Use a fresh Ubuntu 24.04 VM. Ask IT to keep a snapshot before setup.
+Students cannot reset their own password. You do that (see "Everyday tasks").
+
+## Setting up a new server
+
+You need a fresh Ubuntu 24.04 machine. Take a snapshot first if you can.
 
 ```bash
 sudo -i
 cd /opt
 git clone https://github.com/SarayuGautam/5cs045-student-provisioning.git 5cs045-provisioning
-cd /opt/5cs045-provisioning
+cd 5cs045-provisioning
 ./setup/00-server-setup.sh
-```
-
-The setup installs nginx, PHP 8.3-FPM, MariaDB, phpMyAdmin, Composer, SSH, fail2ban, and ACL support.
-
-The setup asks for one shared username and password for the phpMyAdmin admin page. Registration is public.
-
-## 2. Secure MariaDB
-
-```bash
 mysql_secure_installation
 ```
 
-Use these answers:
+The setup script installs everything and asks you to choose a username and password for the phpMyAdmin page.
 
-```text
-Switch to unix_socket authentication: Y
-Change the root password: N
-Remove anonymous users: Y
-Disallow root login remotely: Y
-Remove test database: Y
-Reload privilege tables: Y
-```
+For `mysql_secure_installation`, answer: switch to unix_socket **Y**, change root password **N**, and **Y** to everything else.
 
-## 3. SMTP
+Only run the setup script once. To install newer files later, use "Updating the server".
 
-The SMTP file is outside the web root:
+## Email settings (SMTP)
+
+The server sends email through your college's mail server. The settings live in `/etc/5cs045/smtp_config.php`. This file is only on the server and is never in Git.
 
 ```bash
-nano /etc/5cs045/smtp_config.php
+sudo nano /etc/5cs045/smtp_config.php
 ```
 
-Set the real values for:
+Fill in:
 
-```text
-host
-port
-username
-password
-from_address
-from_name
-use_starttls
-allowed_email_domain
-server_url
-```
+| Setting | Meaning |
+|---|---|
+| host, port | The mail server address and port (usually port 587) |
+| username, password | The login of the sending mailbox |
+| from_address, from_name | What students see as the sender |
+| use_starttls | Keep `true` for port 587 |
+| allowed_email_domain | Only emails ending in this can register |
+| server_url | The address students use, for example `https://10.80.0.250` |
 
-The repository only contains a template, `web/smtp_config.example.php`, with a placeholder password. Setup copies it to `/etc/5cs045/smtp_config.php` once; after that, edit only the copy on the server. The real password must never be committed. `.gitignore` blocks `smtp_config.php`.
-
-Test one email with:
+Send yourself a test email:
 
 ```bash
-php test/smtp-test.php your.email@heraldcollege.edu.np
+sudo php /opt/5cs045-provisioning/test/smtp-test.php your.name@heraldcollege.edu.np
 ```
 
-## 4. Update an already configured VM
+If it fails, the error message says what went wrong (wrong password, server unreachable, and so on).
 
-After the v2 files have been committed and pushed to Git:
+`web/smtp_config.example.php` in this repository is only a template. Never put the real password in it.
+
+## Everyday tasks
+
+The admin scripts are in `/usr/local/sbin/5cs045/bin/`. To save typing:
+
+```bash
+cd /usr/local/sbin/5cs045/bin
+```
+
+### Create a student by hand
+
+```bash
+sudo ./add-student.sh -u sarayu_gautam -n "Sarayu Gautam" -e sarayu.gautam@heraldcollege.edu.np
+```
+
+- `-u` is the username: 3 to 32 characters, lowercase letters, numbers and underscores, starting with a letter.
+- `-n` is the full name (optional).
+- `-e` is the email (optional but recommended). It stops the registration page creating a second account for the same person.
+
+The script prints the password once. To email the details to the student:
+
+```bash
+sudo php resend-credentials.php sarayu.gautam@heraldcollege.edu.np
+```
+
+### A student lost or deleted their email
+
+Send it again. This emails the same password again:
+
+```bash
+sudo php resend-credentials.php student@heraldcollege.edu.np
+```
+
+If the student changed their password themselves, first give them a new one (next section), then send the email.
+
+### A student forgot their password
+
+```bash
+sudo ./reset-student-password.sh -u sarayu_gautam
+sudo php resend-credentials.php sarayu.gautam@heraldcollege.edu.np
+```
+
+The first command makes a new password and prints it. It changes the SSH and database password together. The second emails it. If email is not working, give the student the password another way.
+
+### A student wants to start again
+
+Removing a student saves a backup of their files first, then deletes the account, database and website:
+
+```bash
+sudo ./remove-student.sh -u sarayu_gautam
+```
+
+Backups are saved in `/srv/students-archive/`. Add `--no-backup` to skip the backup. After removal the student can register again with the same email.
+
+### See all students
+
+```bash
+sudo ./list-students.sh
+```
+
+### See who registered and what went wrong
+
+```bash
+sudo tail -50 /var/log/5cs045-registration.log
+sudo tail -50 /var/log/5cs045-provisioning.log
+```
+
+## Putting a website on the server (as a student)
+
+These steps run on the student's own laptop, not on the server. The example uses the demo portfolio in this repository (`demo-student-portfolio-blade`) and the student `sarayu_gautam`.
+
+### 1. Upload the folder
+
+Open a terminal on your laptop, go to the folder that contains the project, then:
+
+```bash
+scp -r demo-student-portfolio-blade sarayu_gautam@<server>:~/assessments/portfolio
+```
+
+Type the password from the email when asked. Answer `yes` if it asks about the server's fingerprint. Anything you upload to `workshops`, `exams` or `assessments` is on the web straight away. There is no need to run `chmod`.
+
+### 2. Log in and finish the setup
+
+```bash
+ssh sarayu_gautam@<server>
+cd ~/assessments/portfolio
+composer install --no-dev
+cp config.example.php config.php
+nano config.php
+```
+
+In `config.php` put your username, your password and `student_<username>` as the database name. Then create the tables. It asks for your password:
+
+```bash
+mysql -u sarayu_gautam -p student_sarayu_gautam < schema.sql
+```
+
+### 3. Open it
+
+`https://<server>/~sarayu_gautam/assessments/portfolio/register.php`
+
+The browser warns about the certificate because it is self-signed. Choose to continue anyway.
+
+To change the site later, edit the files on your laptop and run the `scp` command again.
+
+## Updating the server
+
+When the repository has new files, on the server:
 
 ```bash
 cd /opt/5cs045-provisioning
 git pull
-sudo ./setup/apply-v2-existing.sh
+sudo ./setup/update-server.sh
 ```
 
-This makes registration public, keeps Basic Auth on phpMyAdmin, installs the admin password reset script, and updates the nginx configuration. It does not overwrite the live SMTP secret.
+This copies the new scripts and pages into place. It does not touch email settings, students or the phpMyAdmin password.
 
-Run the security test after the update:
+## Checking the server is healthy
 
 ```bash
 sudo ./test/smoke-test.sh
 ```
 
-A clean v2 run should finish with `16 passed, 0 failed`.
+It creates two temporary students, checks that they cannot read each other's files, and removes them. Run it after setup and after updates. Every line should say PASS.
 
-## 5. Register a student
-
-Open:
-
-```text
-https://<server>/register.php
-```
-
-The form asks only for the college email. The student receives:
-
-```text
-Your Server Credentials
-
-Welcome to the Server!
-
-Full Stack Development Module Server
-
-Here are your access details:
------------------------------
-Username: ...
-Password: ...
-Database: ...
-Website URL: https://<server>/~username/
-
-Please keep this safe.
-```
-
-If the email was already registered, the page rejects the request.
-
-## 6. Reset a student password
-
-Only root/admin should run this:
+To check the services:
 
 ```bash
-sudo /usr/local/sbin/5cs045/bin/reset-student-password.sh -u <username>
+systemctl status nginx php8.3-fpm mariadb ssh fail2ban --no-pager
+sudo nginx -t
 ```
 
-The script changes the Linux password, MySQL password, and `credentials.txt`. It prints the new password once. Send it to the student using the approved communication method.
+## Common problems
 
-## 7. Check the server
+**The registration page says "could not send the email".** The account was created but the email failed. Fix the email settings (run the SMTP test), then run `resend-credentials.php` for that student.
 
-```bash
-systemctl status nginx --no-pager
-systemctl status php8.3-fpm --no-pager
-systemctl status mariadb --no-pager
-systemctl status ssh --no-pager
-systemctl status fail2ban --no-pager
-nginx -t
-sshd -t
-/usr/local/sbin/5cs045/bin/list-students.sh
-```
+**A student says "this email has already been registered".** They registered before. Run `resend-credentials.php` with their email. If the account was removed by mistake, run `add-student.sh` again.
 
-## 8. Student website URLs
+**The student's website shows 404.** The file is not in the right folder. It must be inside `workshops`, `exams` or `assessments`. Check with `ls /srv/students/<username>/assessments`.
+
+**The student's website shows 502 or a blank page.** Look at their PHP error log: `sudo tail /srv/students/<username>/.sessions/php-error.log`. If it is a 502, run `sudo systemctl status php8.3-fpm` and check the file `/etc/php/8.3/fpm/pool.d/<username>.conf` exists.
+
+**A student cannot log in over SSH.** Reset their password. Repeated wrong passwords get an address blocked for an hour by fail2ban. To unblock: `sudo fail2ban-client set sshd unbanip <address>`.
+
+**`composer install` fails on the server.** The server needs internet access to packagist.org. If it is blocked, run `composer install --no-dev` on your laptop instead and upload the whole folder, including `vendor`.
+
+**Nginx will not reload.** Run `sudo nginx -t`. It shows the file and line with the mistake.
+
+**Registration says "Please wait a few minutes".** The same email tried twice within five minutes. Wait, or delete the file for that email in `/var/lib/5cs045-ratelimit/`.
+
+## Safety rules
+
+- The real SMTP password stays only in `/etc/5cs045/smtp_config.php` (owner `root`, group `www-data`, mode `640`). Never commit it or paste it into chat or email.
+- Never commit student passwords or `credentials.txt` files.
+- The phpMyAdmin password file `/etc/nginx/.htpasswd-admin` also stays mode `640`.
+- The certificate is self-signed. Replace it when the college gives you a proper server name.
+- To remove everything (students, settings, web files): `sudo ./setup/uninstall.sh`.
+
+## What is in this repository
 
 ```text
-https://<server>/~<username>/workshops/
-https://<server>/~<username>/exams/
-https://<server>/~<username>/assessments/
+bin/add-student.sh              Create a student
+bin/remove-student.sh           Remove a student
+bin/reset-student-password.sh   New password for a student
+bin/resend-credentials.php      Email a student their details again
+bin/list-students.sh            List students
+setup/00-server-setup.sh        First-time setup
+setup/update-server.sh          Install new files on a working server
+setup/uninstall.sh              Remove everything
+templates/                      nginx, PHP and SSH settings used by the scripts
+test/smoke-test.sh              Security and isolation check
+test/smtp-test.php              Send one test email
+web/                            Registration page and email code
+demo-student-portfolio-blade/   Example website for students to deploy
+docs/Server_Access_Guide.docx   Guide for students
 ```
-
-The clean student URL `https://<server>/~<username>/` redirects to `assessments/`.
-
-## 9. Demo portfolio
-
-`demo-student-portfolio-blade/` is a small Blade portfolio for testing the student server. It includes:
-
-- PHP + MySQL
-- CRUD for projects
-- Prepared statements
-- Output escaping
-- Server-side validation
-- CSRF protection
-- Ajax search with Fetch API
-- Session-based authentication
-- Blade templates
-
-BladeOne is installed with Composer.
-
-## 10. Important files
-
-```text
-setup/00-server-setup.sh          Fresh VM setup
-setup/apply-v2-existing.sh        Update an existing VM
-bin/add-student.sh                Admin/manual account creation
-bin/reset-student-password.sh    Admin password reset
-bin/remove-student.sh             Remove a student
-bin/list-students.sh              List students
-web/register.php                  Public registration page
-web/register_handler.php          Registration backend
-web/smtp_config.example.php       SMTP settings template (real file lives in /etc/5cs045/)
-test/smoke-test.sh                Security and isolation test
-test/smtp-test.php                Single SMTP test
-```
-
-## Security rules
-
-- Keep `/etc/5cs045/smtp_config.php` at `root:www-data` mode `640`.
-- Keep the phpMyAdmin Basic Auth file at `root:www-data` mode `640`.
-- Do not commit real SMTP passwords or student credentials.
-- Do not run the full setup script again on an already configured server.
-- Replace the self-signed certificate when IT provides the final DNS name.
