@@ -39,8 +39,8 @@ Database: {$username}
 Your websites:
 Workshops: {$site}/workshops/
 (make one folder for each week, for example workshops/week1)
-Assessments: {$site}/assessments/
-Exams: {$site}/exams/
+Assessment: {$site}/assessment/
+Exam: {$site}/exam/
 
 Please keep this safe.
 

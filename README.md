@@ -7,12 +7,12 @@ Every command below is run on the server, over SSH, unless it says otherwise.
 ## What a student gets
 
 - A login (username and password). The same password works for SSH, SCP and MySQL.
-- Three website folders: `workshops`, `exams` and `assessments`.
+- Three website folders: `workshops`, `exam` and `assessment`.
 - One database, with the same name as the username.
 - Three websites:
   - `https://<server>/~<username>/workshops/` for weekly work. The student makes one folder per week, for example `workshops/week1`.
-  - `https://<server>/~<username>/assessments/` for the assessment project (one project).
-  - `https://<server>/~<username>/exams/` for exams.
+  - `https://<server>/~<username>/assessment/` for the assessment project (one project).
+  - `https://<server>/~<username>/exam/` for the exam.
 
 Students cannot see or change each other's files. Their PHP code runs as their own user.
 
@@ -149,16 +149,16 @@ These steps run on the student's own laptop, not on the server. The example uses
 Open a terminal on your laptop, go to the folder that contains the project, then:
 
 ```bash
-scp -r demo-student-portfolio-blade sarayu_gautam@<server>:~/assessments/portfolio
+scp -r demo-student-portfolio-blade sarayu_gautam@<server>:~/assessment/portfolio
 ```
 
-Type the password from the email when asked. Answer `yes` if it asks about the server's fingerprint. Anything you upload to `workshops`, `exams` or `assessments` is on the web straight away. There is no need to run `chmod`.
+Type the password from the email when asked. Answer `yes` if it asks about the server's fingerprint. Anything you upload to `workshops`, `exam` or `assessment` is on the web straight away. There is no need to run `chmod`.
 
 ### 2. Log in and finish the setup
 
 ```bash
 ssh sarayu_gautam@<server>
-cd ~/assessments/portfolio
+cd ~/assessment/portfolio
 composer install --no-dev
 cp config.example.php config.php
 nano config.php
@@ -172,7 +172,7 @@ mysql -u sarayu_gautam -p sarayu_gautam < schema.sql
 
 ### 3. Open it
 
-`https://<server>/~sarayu_gautam/assessments/portfolio/register.php`
+`https://<server>/~sarayu_gautam/assessment/portfolio/register.php`
 
 The browser warns about the certificate because it is self-signed. Choose to continue anyway.
 
@@ -211,7 +211,7 @@ sudo nginx -t
 
 **A student says "this email has already been registered".** They registered before. Run `resend-credentials.php` with their email. If the account was removed by mistake, run `add-student.sh` again.
 
-**The student's website shows 404.** The file is not in the right folder. It must be inside `workshops`, `exams` or `assessments`. Check with `ls /srv/students/<username>/assessments`.
+**The student's website shows 404.** The file is not in the right folder. It must be inside `workshops`, `exam` or `assessment`. Check with `ls /srv/students/<username>/assessment`.
 
 **The student's website shows 502 or a blank page.** Look at their PHP error log: `sudo tail /srv/students/<username>/.sessions/php-error.log`. If it is a 502, run `sudo systemctl status php8.3-fpm` and check the file `/etc/php/8.3/fpm/pool.d/<username>.conf` exists.
 

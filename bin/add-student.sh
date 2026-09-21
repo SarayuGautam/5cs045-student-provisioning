@@ -66,7 +66,7 @@ setfacl -m "g:${WEB_GROUP}:x" "$HOME_DIR"
 
 # The three web folders. The ACLs let the web server read anything the student
 # uploads, without the student running chmod.
-for area in workshops exams assessments; do
+for area in workshops exam assessment; do
   dir="${HOME_DIR}/${area}"
   mkdir -p "$dir"
   chown "${USERNAME}:${USERNAME}" "$dir"
@@ -131,5 +131,5 @@ echo "Student:      ${USERNAME}"
 echo "Password:     ${PASSWORD}   (same for SSH, SCP and MySQL)"
 echo "Database:     ${DB_NAME}"
 echo "Workshops:    ${SERVER_URL}/~${USERNAME}/workshops/   (one folder per week)"
-echo "Assessments:  ${SERVER_URL}/~${USERNAME}/assessments/"
-echo "Exams:        ${SERVER_URL}/~${USERNAME}/exams/"
+echo "Assessment:  ${SERVER_URL}/~${USERNAME}/assessment/"
+echo "Exam:        ${SERVER_URL}/~${USERNAME}/exam/"

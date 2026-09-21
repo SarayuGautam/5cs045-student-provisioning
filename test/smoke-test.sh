@@ -45,44 +45,44 @@ su - smoketest_a -s /bin/bash -c 'ls /srv/students/smoketest_b/' >/dev/null 2>&1
   && bad "A can list B's home directory" || ok "A cannot list B's home directory"
 su - smoketest_a -s /bin/bash -c 'cat /srv/students/smoketest_b/credentials.txt' >/dev/null 2>&1 \
   && bad "A can read B's credentials" || ok "A cannot read B's credentials"
-su - smoketest_a -s /bin/bash -c 'echo x > /srv/students/smoketest_b/assessments/x' >/dev/null 2>&1 \
-  && bad "A can write into B's assessments folder" || ok "A cannot write into B's assessments folder"
+su - smoketest_a -s /bin/bash -c 'echo x > /srv/students/smoketest_b/assessment/x' >/dev/null 2>&1 \
+  && bad "A can write into B's assessment folder" || ok "A cannot write into B's assessment folder"
 su - smoketest_a -s /bin/bash -c 'ls /srv/students/' >/dev/null 2>&1 \
   && bad "A can enumerate other student usernames" || ok "A cannot enumerate other student usernames"
 
 echo ""
 echo "=== automatic read-access checks ==="
-su - smoketest_a -s /bin/bash -c 'mkdir -p /srv/students/smoketest_a/assessments/sub && echo hi > /srv/students/smoketest_a/assessments/sub/f.txt'
-su -s /bin/bash www-data -c 'cat /srv/students/smoketest_a/assessments/sub/f.txt' >/dev/null 2>&1 \
+su - smoketest_a -s /bin/bash -c 'mkdir -p /srv/students/smoketest_a/assessment/sub && echo hi > /srv/students/smoketest_a/assessment/sub/f.txt'
+su -s /bin/bash www-data -c 'cat /srv/students/smoketest_a/assessment/sub/f.txt' >/dev/null 2>&1 \
   && ok "www-data can read newly-created content without chmod" \
   || bad "www-data could not read newly-created content"
-su -s /bin/bash www-data -c 'echo tampered > /srv/students/smoketest_a/assessments/sub/f.txt' >/dev/null 2>&1 \
+su -s /bin/bash www-data -c 'echo tampered > /srv/students/smoketest_a/assessment/sub/f.txt' >/dev/null 2>&1 \
   && bad "www-data can write to student content" \
   || ok "www-data cannot write to student content"
 
 echo ""
 echo "=== PHP-FPM process isolation ==="
-su - smoketest_a -s /bin/bash -c 'echo "<?php echo posix_getpwuid(posix_geteuid())[\"name\"]; ?>" > /srv/students/smoketest_a/assessments/whoami.php'
-RESULT="$(curl -k -s "$BASE_URL/~smoketest_a/assessments/whoami.php" 2>/dev/null)"
+su - smoketest_a -s /bin/bash -c 'echo "<?php echo posix_getpwuid(posix_geteuid())[\"name\"]; ?>" > /srv/students/smoketest_a/assessment/whoami.php'
+RESULT="$(curl -k -s "$BASE_URL/~smoketest_a/assessment/whoami.php" 2>/dev/null)"
 [[ "$RESULT" == "smoketest_a" ]] \
   && ok "PHP for A executes as smoketest_a" \
   || bad "PHP did not execute as smoketest_a (got: '$RESULT')"
-su - smoketest_a -s /bin/bash -c "cat > /srv/students/smoketest_a/assessments/attack.php" <<-'PHP'
-<?php echo @file_get_contents('/srv/students/smoketest_b/assessments/index.php') === false ? 'BLOCKED' : 'LEAKED';
+su - smoketest_a -s /bin/bash -c "cat > /srv/students/smoketest_a/assessment/attack.php" <<-'PHP'
+<?php echo @file_get_contents('/srv/students/smoketest_b/assessment/index.php') === false ? 'BLOCKED' : 'LEAKED';
 PHP
-RESULT="$(curl -k -s "$BASE_URL/~smoketest_a/assessments/attack.php" 2>/dev/null)"
+RESULT="$(curl -k -s "$BASE_URL/~smoketest_a/assessment/attack.php" 2>/dev/null)"
 [[ "$RESULT" == "BLOCKED" ]] \
   && ok "A's PHP code cannot read B's files" \
   || bad "A's PHP code could read B's files (got: '$RESULT')"
-git -C /srv/students/smoketest_a/assessments init -q 2>/dev/null
-echo "[core]" > /srv/students/smoketest_a/assessments/.git/config 2>/dev/null
-chown -R smoketest_a:smoketest_a /srv/students/smoketest_a/assessments/.git 2>/dev/null
-check_code "$BASE_URL/~smoketest_a/assessments/.git/config" "404" ".git metadata is not servable over HTTPS"
+git -C /srv/students/smoketest_a/assessment init -q 2>/dev/null
+echo "[core]" > /srv/students/smoketest_a/assessment/.git/config 2>/dev/null
+chown -R smoketest_a:smoketest_a /srv/students/smoketest_a/assessment/.git 2>/dev/null
+check_code "$BASE_URL/~smoketest_a/assessment/.git/config" "404" ".git metadata is not servable over HTTPS"
 check_code "$BASE_URL/smtp_config.php" "404" "smtp_config.php is not servable over HTTPS"
 
 
 ROOT_CODE="$(curl -k -s -o /dev/null -w '%{http_code}' "$BASE_URL/~smoketest_a/" 2>/dev/null)"
-[[ "$ROOT_CODE" == "302" ]] && ok "student root URL redirects to the assessments area" || bad "student root URL did not redirect (got HTTP $ROOT_CODE)"
+[[ "$ROOT_CODE" == "302" ]] && ok "student root URL redirects to the assessment area" || bad "student root URL did not redirect (got HTTP $ROOT_CODE)"
 
 echo ""
 echo "=== public registration and admin protection ==="
