@@ -14,6 +14,8 @@ Every command below is run on the server, over SSH, unless it says otherwise.
   - `https://<server>/~<username>/assessment/` for the assessment project (one project).
   - `https://<server>/~<username>/exam/` for the exam.
 
+Opening `https://<server>/~<username>/` shows a welcome page with the student's name. Each new folder starts with a one-line note about what it is for. The note goes away as soon as the student uploads their own `index.html` or `index.php`.
+
 Students cannot see or change each other's files. Their PHP code runs as their own user.
 
 The username comes from the email. `sarayu.gautam@heraldcollege.edu.np` becomes `sarayu_gautam`.

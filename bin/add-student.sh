@@ -79,6 +79,21 @@ for area in workshops exam assessment; do
   setfacl -R -m "d:g:${WEB_GROUP}:rx" "$dir"
 done
 
+# A short note in each folder until the student uploads their own index page
+declare -A FOLDER_INFO=(
+  [workshops]="Use this folder for your weekly workshop work. Make one folder for each week, for example week1."
+  [exam]="Use this folder for the timed practical exam."
+  [assessment]="Use this folder for your final assessment project."
+)
+for area in workshops exam assessment; do
+  dir="${HOME_DIR}/${area}"
+  if ! ls "$dir"/index.* >/dev/null 2>&1; then
+    printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>%s</title></head>\n<body style="font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem">\n<h1>%s</h1>\n<p>%s</p>\n</body></html>\n' \
+      "$area" "$area" "${FOLDER_INFO[$area]}" > "${dir}/index.html"
+    chown "${USERNAME}:${USERNAME}" "${dir}/index.html"
+  fi
+done
+
 # Private folders (not served by the web)
 for private in .ssh .sessions; do
   mkdir -p "${HOME_DIR}/${private}"

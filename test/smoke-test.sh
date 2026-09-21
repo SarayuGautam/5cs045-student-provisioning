@@ -81,8 +81,10 @@ check_code "$BASE_URL/~smoketest_a/assessment/.git/config" "404" ".git metadata 
 check_code "$BASE_URL/smtp_config.php" "404" "smtp_config.php is not servable over HTTPS"
 
 
-ROOT_CODE="$(curl -k -s -o /dev/null -w '%{http_code}' "$BASE_URL/~smoketest_a/" 2>/dev/null)"
-[[ "$ROOT_CODE" == "302" ]] && ok "student root URL redirects to the assessment area" || bad "student root URL did not redirect (got HTTP $ROOT_CODE)"
+ROOT_PAGE="$(curl -k -s "$BASE_URL/~smoketest_a/" 2>/dev/null)"
+[[ "$ROOT_PAGE" == *"Welcome, smoketest_a"* ]] && ok "student root URL shows the welcome page" || bad "student root URL did not show the welcome page"
+FOLDER_PAGE="$(curl -k -s "$BASE_URL/~smoketest_b/workshops/" 2>/dev/null)"
+[[ "$FOLDER_PAGE" == *"weekly workshop work"* ]] && ok "an empty folder shows its short description" || bad "an empty folder did not show its description"
 
 echo ""
 echo "=== public registration and admin protection ==="
