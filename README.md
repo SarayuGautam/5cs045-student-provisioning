@@ -149,8 +149,10 @@ These steps run on the student's own laptop, not on the server. The example uses
 Open a terminal on your laptop, go to the folder that contains the project, then:
 
 ```bash
-scp -r demo-student-portfolio-blade sarayu_gautam@<server>:~/assessment/portfolio
+scp -r demo-student-portfolio-blade/. sarayu_gautam@<server>:~/assessment/
 ```
+
+The `/.` after the folder name matters. It copies the files inside the project straight into `assessment`, so the site opens at `https://<server>/~sarayu_gautam/assessment/` and not in a sub-folder.
 
 Type the password from the email when asked. Answer `yes` if it asks about the server's fingerprint. Anything you upload to `workshops`, `exam` or `assessment` is on the web straight away. There is no need to run `chmod`.
 
@@ -158,7 +160,7 @@ Type the password from the email when asked. Answer `yes` if it asks about the s
 
 ```bash
 ssh sarayu_gautam@<server>
-cd ~/assessment/portfolio
+cd ~/assessment
 composer install --no-dev
 cp config.example.php config.php
 nano config.php
@@ -172,7 +174,9 @@ mysql -u sarayu_gautam -p sarayu_gautam < schema.sql
 
 ### 3. Open it
 
-`https://<server>/~sarayu_gautam/assessment/portfolio/register.php`
+`https://<server>/~sarayu_gautam/assessment/`
+
+The first time, click "Create one" to make a demo user, then log in.
 
 The browser warns about the certificate because it is self-signed. Choose to continue anyway.
 
