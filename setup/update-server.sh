@@ -22,6 +22,8 @@ chown -R www-data:www-data /var/www/html
 cp "${REPO_ROOT}/templates/nginx-students.conf" /etc/nginx/sites-available/students
 install -d -o www-data -g www-data -m 700 /var/lib/5cs045-registrations /var/lib/5cs045-ratelimit /var/lib/5cs045-registration-locks
 
+"${DEPLOY_ROOT}/bin/refresh-student-folders.sh" >/dev/null
+
 nginx -t
 systemctl reload nginx php8.3-fpm
 echo "Server updated."

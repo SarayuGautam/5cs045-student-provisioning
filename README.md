@@ -218,6 +218,8 @@ sudo nginx -t
 
 **A student says "this email has already been registered".** They registered before. Run `resend-credentials.php` with their email. If the account was removed by mistake, run `add-student.sh` again.
 
+**A student's folder shows 403 Forbidden.** The folder is empty, so the web server has nothing to show. Run `sudo /usr/local/sbin/5cs045/bin/refresh-student-folders.sh <username>`. It adds the short note page and repairs the folder permissions. Without a username it checks every student.
+
 **The student's website shows 404.** The file is not in the right folder. It must be inside `workshops`, `exam` or `assessment`. Check with `ls /srv/students/<username>/assessment`.
 
 **The student's website shows 502 or a blank page.** Look at their PHP error log: `sudo tail /srv/students/<username>/.sessions/php-error.log`. If it is a 502, run `sudo systemctl status php8.3-fpm` and check the file `/etc/php/8.3/fpm/pool.d/<username>.conf` exists.
@@ -246,6 +248,7 @@ bin/remove-student.sh           Remove a student
 bin/reset-student-password.sh   New password for a student
 bin/resend-credentials.php      Email a student their details again
 bin/list-students.sh            List students
+bin/refresh-student-folders.sh  Fix folder permissions and add the short note pages
 setup/00-server-setup.sh        First-time setup
 setup/update-server.sh          Install new files on a working server
 setup/uninstall.sh              Remove everything
