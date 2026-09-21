@@ -8,8 +8,11 @@ Every command below is run on the server, over SSH, unless it says otherwise.
 
 - A login (username and password). The same password works for SSH, SCP and MySQL.
 - Three website folders: `workshops`, `exams` and `assessments`.
-- One database, named `student_<username>`.
-- A website at `https://<server>/~<username>/`. This address forwards to the `assessments` folder.
+- One database, with the same name as the username.
+- Three websites:
+  - `https://<server>/~<username>/workshops/` for weekly work. The student makes one folder per week, for example `workshops/week1`.
+  - `https://<server>/~<username>/assessments/` for the assessment project (one project).
+  - `https://<server>/~<username>/exams/` for exams.
 
 Students cannot see or change each other's files. Their PHP code runs as their own user.
 
@@ -18,7 +21,7 @@ The username comes from the email. `sarayu.gautam@heraldcollege.edu.np` becomes 
 ## How registration works
 
 1. The student opens `https://<server>/register.php` and types their college email.
-2. The server creates the account and emails them the username, password, database name and website address.
+2. The server creates the account and emails them the username, password, database name and the three website addresses.
 3. Each email can register only once. A second try is refused.
 
 Students cannot reset their own password. You do that (see "Everyday tasks").
@@ -161,10 +164,10 @@ cp config.example.php config.php
 nano config.php
 ```
 
-In `config.php` put your username, your password and `student_<username>` as the database name. Then create the tables. It asks for your password:
+In `config.php` put your username, your password and your username again as the database name. Then create the tables. It asks for your password:
 
 ```bash
-mysql -u sarayu_gautam -p student_sarayu_gautam < schema.sql
+mysql -u sarayu_gautam -p sarayu_gautam < schema.sql
 ```
 
 ### 3. Open it

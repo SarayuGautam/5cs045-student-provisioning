@@ -22,8 +22,7 @@ function registration_key(string $email): string {
 }
 
 function credentials_email_body(string $username, string $password, string $serverUrl): string {
-    $database = "student_{$username}";
-    $website = rtrim($serverUrl, '/') . '/~' . $username . '/';
+    $site = rtrim($serverUrl, '/') . '/~' . $username;
     return <<<TXT
 Your Server Credentials
 
@@ -35,8 +34,13 @@ Here are your access details:
 -----------------------------
 Username: {$username}
 Password: {$password}
-Database: {$database}
-Website URL: {$website}
+Database: {$username}
+
+Your websites:
+Workshops: {$site}/workshops/
+(make one folder for each week, for example workshops/week1)
+Assessments: {$site}/assessments/
+Exams: {$site}/exams/
 
 Please keep this safe.
 

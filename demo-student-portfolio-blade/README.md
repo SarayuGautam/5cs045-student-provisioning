@@ -13,10 +13,10 @@ cd ~/assessments/portfolio
 composer install --no-dev
 cp config.example.php config.php
 nano config.php
-mysql -u <username> -p student_<username> < schema.sql
+mysql -u <username> -p <username> < schema.sql
 ```
 
-In `config.php` set your username, your server password and `student_<username>` as the database.
+In `config.php` set your username, your server password and your username again as the database name.
 
 Then open `https://<server>/~<username>/assessments/portfolio/register.php`, create a user and log in.
 

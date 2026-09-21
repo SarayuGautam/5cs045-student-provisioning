@@ -18,7 +18,7 @@ done
 id "$USERNAME" >/dev/null 2>&1 || { echo "ERROR: no such user: $USERNAME" >&2; exit 1; }
 
 HOME_DIR="/srv/students/${USERNAME}"
-DB_NAME="student_${USERNAME}"
+DB_NAME="${USERNAME}"
 
 PASSWORD_RAW="$(openssl rand -base64 48 | tr -dc 'A-HJ-NP-Za-km-z2-9')"
 PASSWORD="${PASSWORD_RAW:0:14}"

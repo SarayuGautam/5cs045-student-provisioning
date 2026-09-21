@@ -37,10 +37,14 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || die "run this with sudo"
 [[ -n "$USERNAME" ]] || die "-u <username> is required"
 [[ "$USERNAME" =~ $USERNAME_RE ]] || die "username must be 3-32 characters: lowercase letters, numbers and underscores, starting with a letter"
+case "$USERNAME" in
+  mysql|sys|test|root|admin|phpmyadmin|information_schema|performance_schema)
+    die "'$USERNAME' is reserved, choose another username" ;;
+esac
 [[ -f "$POOL_TEMPLATE" ]] || die "missing $POOL_TEMPLATE"
 
 HOME_DIR="${STUDENT_ROOT}/${USERNAME}"
-DB_NAME="student_${USERNAME}"
+DB_NAME="${USERNAME}"
 CRED_FILE="${HOME_DIR}/credentials.txt"
 
 log "creating ${USERNAME}"
@@ -78,12 +82,14 @@ for private in .ssh .sessions; do
   chmod 700 "${HOME_DIR}/${private}"
 done
 
-# Database, with the same password
+# Database, named like the username, with the same password.
+# In GRANT an underscore means "any character", so it is escaped to keep the student inside their own database.
+DB_PATTERN="${DB_NAME//_/\\_}"
 mysql <<-SQL
 	CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;
 	CREATE USER IF NOT EXISTS '${USERNAME}'@'localhost' IDENTIFIED BY '${PASSWORD}';
 	ALTER USER '${USERNAME}'@'localhost' IDENTIFIED BY '${PASSWORD}';
-	GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${USERNAME}'@'localhost';
+	GRANT ALL PRIVILEGES ON \`${DB_PATTERN}\`.* TO '${USERNAME}'@'localhost';
 	FLUSH PRIVILEGES;
 SQL
 
@@ -116,9 +122,14 @@ if [[ -n "$EMAIL" ]]; then
   chmod 600 "${REGISTRY_DIR}/${KEY}"
 fi
 
+SERVER_URL="$(php -r '$c = @include "/etc/5cs045/smtp_config.php"; echo rtrim((string) ($c["server_url"] ?? ""), "/");' 2>/dev/null || true)"
+SERVER_URL="${SERVER_URL:-https://<server>}"
+
 log "${USERNAME} is ready"
 echo ""
 echo "Student:      ${USERNAME}"
 echo "Password:     ${PASSWORD}   (same for SSH, SCP and MySQL)"
 echo "Database:     ${DB_NAME}"
-echo "Website:      https://<server>/~${USERNAME}/assessments/"
+echo "Workshops:    ${SERVER_URL}/~${USERNAME}/workshops/   (one folder per week)"
+echo "Assessments:  ${SERVER_URL}/~${USERNAME}/assessments/"
+echo "Exams:        ${SERVER_URL}/~${USERNAME}/exams/"

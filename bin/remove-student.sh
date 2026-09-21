@@ -41,7 +41,7 @@ fi
 rm -f "/etc/php/${PHP_VERSION}/fpm/pool.d/${USERNAME}.conf" "/run/php/php${PHP_VERSION}-fpm-${USERNAME}.sock"
 systemctl reload "php${PHP_VERSION}-fpm"
 
-mysql -e "DROP DATABASE IF EXISTS \`student_${USERNAME}\`; DROP USER IF EXISTS '${USERNAME}'@'localhost'; FLUSH PRIVILEGES;"
+mysql -e "DROP DATABASE IF EXISTS \`${USERNAME}\`; DROP USER IF EXISTS '${USERNAME}'@'localhost'; FLUSH PRIVILEGES;"
 
 pkill -u "$USERNAME" 2>/dev/null || true
 sleep 1
