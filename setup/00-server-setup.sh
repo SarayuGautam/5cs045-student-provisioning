@@ -94,7 +94,6 @@ chmod 640 /etc/5cs045/smtp_config.php
 
 echo "==> Creating registration state"
 install -d -o www-data -g www-data -m 700 /var/lib/5cs045-ratelimit
-install -d -o www-data -g www-data -m 700 /var/lib/5cs045-ratelimit
 install -d -o www-data -g www-data -m 700 /var/lib/5cs045-registration-locks
 install -d -o www-data -g www-data -m 700 /var/lib/5cs045-registrations
 

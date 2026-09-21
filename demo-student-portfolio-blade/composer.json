@@ -1,0 +1,8 @@
+{
+  "name": "5cs045/demo-student-portfolio-blade",
+  "description": "Demo portfolio for testing the 5CS045 student server",
+  "require": {
+    "php": ">=8.1",
+    "eftec/bladeone": "^4.12"
+  }
+}
