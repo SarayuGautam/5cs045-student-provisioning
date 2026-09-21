@@ -66,6 +66,10 @@ function acquire_request_lock(string $email): ?string {
             return null;
         }
     }
+    // A lock older than two minutes belongs to a request that crashed. Remove it.
+    if (is_dir($lockPath) && (time() - (int) @filemtime($lockPath)) > 120) {
+        @rmdir($lockPath);
+    }
     if (!@mkdir($lockPath, 0700)) {
         return null;
     }
