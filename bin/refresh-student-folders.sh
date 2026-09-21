@@ -9,6 +9,7 @@ set -euo pipefail
 STUDENT_ROOT="/srv/students"
 WEB_GROUP="www-data"
 
+declare -A FOLDER_TITLE=([workshops]="Workshops" [exam]="Exam" [assessment]="Assessment")
 declare -A FOLDER_INFO=(
   [workshops]="Use this folder for your weekly workshop work. Make one folder for each week, for example week1."
   [exam]="Use this folder for the timed practical exam."
@@ -39,8 +40,36 @@ for user in "${USERS[@]}"; do
     setfacl -R -m "g:${WEB_GROUP}:rx" "$dir"
     setfacl -R -m "d:g:${WEB_GROUP}:rx" "$dir"
     if ! ls "$dir"/index.* >/dev/null 2>&1; then
-      printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>%s</title></head>\n<body style="font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem">\n<h1>%s</h1>\n<p>%s</p>\n</body></html>\n' \
-        "$area" "$area" "${FOLDER_INFO[$area]}" > "${dir}/index.html"
+      cat > "${dir}/index.html" <<PAGE
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${FOLDER_TITLE[$area]}</title>
+<style>
+body{margin:0;padding:clamp(48px,12vh,128px) 24px 64px;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:17px;line-height:1.65;color:#000;background:#fff}
+main{max-width:34rem;margin:0 auto}
+h1{margin:0 0 20px;font-size:2rem;line-height:1.2;font-weight:600;letter-spacing:-.01em;overflow-wrap:anywhere}
+h2{margin:56px 0 24px;font-size:1rem;font-weight:600}
+p{margin:0}
+ul{margin:0;padding:0;list-style:none}
+li{margin:0 0 28px}
+li a{font-weight:600}
+li p{margin-top:2px}
+a{color:#000;text-underline-offset:3px}
+.back{display:inline-block;margin-top:48px}
+</style>
+</head>
+<body>
+<main>
+<h1>${FOLDER_TITLE[$area]}</h1>
+<p>${FOLDER_INFO[$area]}</p>
+<a class="back" href="/~${user}/">Back to your home page</a>
+</main>
+</body>
+</html>
+PAGE
       chown "${user}:${user}" "${dir}/index.html"
       setfacl -m "g:${WEB_GROUP}:r" "${dir}/index.html"
     fi
