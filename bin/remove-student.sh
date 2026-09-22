@@ -51,4 +51,6 @@ if [[ -d "$REGISTRY_DIR" ]]; then
   grep -l "\"username\":\"${USERNAME}\"" "$REGISTRY_DIR"/* 2>/dev/null | xargs -r rm -f
 fi
 
+rm -f "/var/lib/5cs045-credentials/${USERNAME}"
+
 echo "${USERNAME} removed."

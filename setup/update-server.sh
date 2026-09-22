@@ -22,6 +22,15 @@ chown -R www-data:www-data /var/www/html
 cp "${REPO_ROOT}/templates/nginx-students.conf" /etc/nginx/sites-available/students
 install -d -o www-data -g www-data -m 700 /var/lib/5cs045-registrations /var/lib/5cs045-ratelimit /var/lib/5cs045-registration-locks
 
+# Move old credentials.txt files out of the students' homes (students could edit them)
+install -d -o root -g root -m 700 /var/lib/5cs045-credentials
+for old in /srv/students/*/credentials.txt; do
+  [[ -f "$old" ]] || continue
+  name="$(basename "$(dirname "$old")")"
+  install -o root -g root -m 600 "$old" "/var/lib/5cs045-credentials/${name}"
+  rm -f "$old"
+done
+
 "${DEPLOY_ROOT}/bin/refresh-student-folders.sh" >/dev/null
 
 nginx -t

@@ -30,15 +30,18 @@ mysql <<-SQL
 	FLUSH PRIVILEGES;
 SQL
 
-cat > "${HOME_DIR}/credentials.txt" <<-EOF
-	# Server login for ${USERNAME}. Keep this private.
+CRED_DIR="/var/lib/5cs045-credentials"
+install -d -o root -g root -m 700 "$CRED_DIR"
+(umask 077; cat > "${CRED_DIR}/${USERNAME}" <<-EOF
+	# Server login for ${USERNAME}. Admin copy, students cannot read it.
 	USERNAME=${USERNAME}
 	PASSWORD=${PASSWORD}
 	DB_HOST=localhost
 	DB_NAME=${DB_NAME}
 	EOF
-chown "${USERNAME}:${USERNAME}" "${HOME_DIR}/credentials.txt"
-chmod 600 "${HOME_DIR}/credentials.txt"
+)
+chown root:root "${CRED_DIR}/${USERNAME}"
+chmod 600 "${CRED_DIR}/${USERNAME}"
 
 echo "Student:  ${USERNAME}"
 echo "Password: ${PASSWORD}"

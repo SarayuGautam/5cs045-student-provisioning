@@ -4,7 +4,7 @@ declare(strict_types=1);
 // Emails a student their login details again (for example after they deleted the first email).
 // Usage: sudo php /usr/local/sbin/5cs045/bin/resend-credentials.php student@heraldcollege.edu.np
 //
-// It sends the password saved in the student's credentials.txt.
+// It sends the password kept in /var/lib/5cs045-credentials/<username>.
 // If the student has changed their password themselves, run reset-student-password.sh first.
 
 if (PHP_SAPI !== 'cli' || posix_geteuid() !== 0) {
@@ -30,7 +30,7 @@ if (is_file($record)) {
 }
 $username ??= derive_username($email);
 
-$credentialsFile = $username ? "/srv/students/{$username}/credentials.txt" : '';
+$credentialsFile = $username ? "/var/lib/5cs045-credentials/{$username}" : '';
 if ($username === null || !is_file($credentialsFile)) {
     fwrite(STDERR, "No student account found for {$email}.\n");
     exit(1);

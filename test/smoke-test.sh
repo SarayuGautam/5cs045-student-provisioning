@@ -43,8 +43,10 @@ echo ""
 echo "=== student isolation checks ==="
 su - smoketest_a -s /bin/bash -c 'ls /srv/students/smoketest_b/' >/dev/null 2>&1 \
   && bad "A can list B's home directory" || ok "A cannot list B's home directory"
-su - smoketest_a -s /bin/bash -c 'cat /srv/students/smoketest_b/credentials.txt' >/dev/null 2>&1 \
+su - smoketest_a -s /bin/bash -c 'cat /var/lib/5cs045-credentials/smoketest_b' >/dev/null 2>&1 \
   && bad "A can read B's credentials" || ok "A cannot read B's credentials"
+[[ ! -e /srv/students/smoketest_a/credentials.txt ]] \
+  && ok "no credentials.txt in the student's home" || bad "credentials.txt is in the student's home"
 su - smoketest_a -s /bin/bash -c 'echo x > /srv/students/smoketest_b/assessment/x' >/dev/null 2>&1 \
   && bad "A can write into B's assessment folder" || ok "A cannot write into B's assessment folder"
 su - smoketest_a -s /bin/bash -c 'ls /srv/students/' >/dev/null 2>&1 \

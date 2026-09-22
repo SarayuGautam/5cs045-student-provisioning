@@ -6,7 +6,8 @@
 # -e records the email so the registration page will not create a second account for it.
 # -d reloads PHP 10 seconds later instead of straight away. The registration page uses it,
 #    because reloading PHP would otherwise cut off the page that is running this script.
-# The script prints the password once. It is also saved in the student's credentials.txt.
+# The script prints the password once. A copy is kept for the admin in
+# /var/lib/5cs045-credentials/<username> (root only, the student cannot see or change it).
 # The same password works for SSH, SCP and MySQL.
 set -euo pipefail
 
@@ -16,6 +17,7 @@ FPM_POOL_DIR="/etc/php/${PHP_VERSION}/fpm/pool.d"
 FPM_SOCK_DIR="/run/php"
 WEB_GROUP="www-data"
 REGISTRY_DIR="/var/lib/5cs045-registrations"
+CRED_DIR="/var/lib/5cs045-credentials"
 LOG_FILE="/var/log/5cs045-provisioning.log"
 POOL_TEMPLATE="$(dirname "$0")/../templates/php-fpm-pool.conf.template"
 USERNAME_RE='^[a-z][a-z0-9_]{2,31}$'
@@ -49,7 +51,7 @@ esac
 
 HOME_DIR="${STUDENT_ROOT}/${USERNAME}"
 DB_NAME="${USERNAME}"
-CRED_FILE="${HOME_DIR}/credentials.txt"
+CRED_FILE="${CRED_DIR}/${USERNAME}"
 
 log "creating ${USERNAME}"
 
@@ -88,14 +90,16 @@ mysql <<-SQL
 	FLUSH PRIVILEGES;
 SQL
 
-cat > "$CRED_FILE" <<-EOF
-	# Server login for ${USERNAME}. Keep this private.
+install -d -o root -g root -m 700 "$CRED_DIR"
+(umask 077; cat > "$CRED_FILE" <<-EOF
+	# Server login for ${USERNAME}. Admin copy, students cannot read it.
 	USERNAME=${USERNAME}
 	PASSWORD=${PASSWORD}
 	DB_HOST=localhost
 	DB_NAME=${DB_NAME}
 	EOF
-chown "${USERNAME}:${USERNAME}" "$CRED_FILE"
+)
+chown root:root "$CRED_FILE"
 chmod 600 "$CRED_FILE"
 
 # PHP pool: the student's PHP runs as the student

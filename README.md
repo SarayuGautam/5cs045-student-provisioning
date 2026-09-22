@@ -235,7 +235,8 @@ sudo nginx -t
 ## Safety rules
 
 - The real SMTP password stays only in `/etc/5cs045/smtp_config.php` (owner `root`, group `www-data`, mode `640`). Never commit it or paste it into chat or email.
-- Never commit student passwords or `credentials.txt` files.
+- To see a student's saved password: `sudo cat /var/lib/5cs045-credentials/sarayu_gautam`. Only root can read these files.
+- Never commit student passwords or the files in `/var/lib/5cs045-credentials`.
 - The phpMyAdmin password file `/etc/nginx/.htpasswd-admin` also stays mode `640`.
 - The certificate is self-signed. Replace it when the college gives you a proper server name.
 - To remove everything (students, settings, web files): `sudo ./setup/uninstall.sh`.
