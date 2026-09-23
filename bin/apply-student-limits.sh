@@ -2,6 +2,7 @@
 # Applies the per-student resource limits:
 #   - a 500 MB disk quota (covers the website, SCP/SFTP uploads and anything else the student writes)
 #   - CPU, memory and process limits on everything the student runs over SSH
+#   - membership of the 5cs045-students group, which carries a backup process limit
 # PHP for the websites is limited separately, in the student's PHP pool.
 # Safe to run again at any time.
 #
@@ -20,6 +21,9 @@ QUOTA_KB=512000
 CPU_QUOTA="100%"
 MEMORY_MAX="1G"
 TASKS_MAX=200
+# Members get a second, simpler process limit at every SSH login
+# (/etc/security/limits.d/5cs045-students.conf), even if their systemd session could not be created.
+STUDENT_GROUP="5cs045-students"
 LOG_FILE="/var/log/5cs045-provisioning.log"
 
 log() { echo "[$(date -Is)] $*" | tee -a "$LOG_FILE" >&2; }
@@ -51,10 +55,16 @@ else
   log "WARNING: disk quotas are not enabled on ${STUDENT_ROOT}; students have no disk cap (see \"Resource limits\" in README.md)"
 fi
 
+getent group "$STUDENT_GROUP" >/dev/null || groupadd "$STUDENT_GROUP"
+
 applied=0
 for user in "${USERS[@]}"; do
   id "$user" &>/dev/null && [[ -d "${STUDENT_ROOT}/${user}" ]] || { echo "skipped $user (no such student)"; continue; }
   uid="$(id -u "$user")"
+
+  if [[ " $(id -nG "$user") " != *" ${STUDENT_GROUP} "* ]]; then
+    usermod -aG "$STUDENT_GROUP" "$user"
+  fi
 
   if [[ "$QUOTAS_ON" -eq 1 ]]; then
     setquota -u "$user" "$QUOTA_KB" "$QUOTA_KB" 0 0 "$QUOTA_MOUNT" || log "WARNING: could not set the disk quota for ${user}"

@@ -64,6 +64,13 @@ sshd -t
 echo "==> Enabling fail2ban for SSH"
 cp "${REPO_ROOT}/templates/fail2ban-5cs045.conf" /etc/fail2ban/jail.d/5cs045-sshd.conf
 
+echo "==> Letting a whole class log in at once"
+# Room on the system bus for every login's session request (see the template for why)
+install -o root -g root -m 644 "${REPO_ROOT}/templates/dbus-5cs045-limits.conf" /etc/dbus-1/system.d/5cs045-limits.conf
+systemctl reload dbus
+getent group 5cs045-students >/dev/null || groupadd 5cs045-students
+install -o root -g root -m 644 "${REPO_ROOT}/templates/limits-5cs045-students.conf" /etc/security/limits.d/5cs045-students.conf
+
 echo "==> Scheduling the limits job, and blocking cron for students"
 install -o root -g root -m 644 "${REPO_ROOT}/templates/cron-5cs045" /etc/cron.d/5cs045
 # Jobs from cron and at would run outside the per-student CPU and memory limits, so only root may use them

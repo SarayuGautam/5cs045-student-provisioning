@@ -118,6 +118,12 @@ FPM_LIMIT="$(awk '/Max open files/{ print $4 }' "/proc/$(cat /run/php/php8.3-fpm
 [[ "$(sshd -T 2>/dev/null | awk '$1 == "maxstartups" { print $2 }')" == "1000:30:1500" ]] \
   && ok "sshd accepts a whole lab logging in at once" \
   || bad "sshd MaxStartups is not 1000:30:1500, so mass logins get dropped"
+[[ -f /etc/dbus-1/system.d/5cs045-limits.conf ]] \
+  && ok "the system bus has room for a whole class logging in at once" \
+  || bad "/etc/dbus-1/system.d/5cs045-limits.conf is missing, so mass logins lose their limits"
+[[ " $(id -nG smoketest_a) " == *" 5cs045-students "* ]] && [[ -f /etc/security/limits.d/5cs045-students.conf ]] \
+  && ok "new student has the backup process limit" \
+  || bad "new student is not in 5cs045-students, or /etc/security/limits.d/5cs045-students.conf is missing"
 [[ -f /etc/cron.d/5cs045 ]] && "$DEPLOY_ROOT/bin/enforce-limits.sh" \
   && ok "the limits job is scheduled and runs cleanly" || bad "the limits job is missing or failed"
 

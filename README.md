@@ -263,7 +263,7 @@ Go up in steps (`--users 100`, `200`, `400`, `800`) so you can see where it star
 
 `--ramp 60` spreads the logins over a minute, like a real class arriving. Without it, everyone connects in the same second, which is the worst case.
 
-A healthy result: every student succeeds, the median login is a few seconds, free memory never gets close to zero, no swap is used, and the monitor reports no MaxStartups throttling. The script lists the reason for every failure, and saves a line per student to a CSV.
+A healthy result: every student succeeds, the median login is a few seconds, free memory never gets close to zero, no swap is used, and the monitor reports no MaxStartups throttling. "Most login sessions" should also match "Most SSH connections": fewer sessions means some logins got in without their CPU and memory limits (check with `journalctl --since "10 min ago" | grep -c "Failed to create session"`). The script lists the reason for every failure, and saves a line per student to a CSV.
 
 **6. Clean up.**
 
@@ -287,6 +287,8 @@ Every student gets these limits automatically, so one account cannot fill the di
 | PHP error log (`.sessions/php-error.log`) | 5 MB | Cut down to its last 1 MB, so a noisy bug cannot eat the disk quota |
 
 Students cannot use `cron` or `at`: those jobs would run outside the limits. Only root can schedule jobs, so use `sudo crontab -e` for your own.
+
+The SSH limits depend on each login getting a systemd session. When a whole class logs in within the same few seconds, the system bus has to handle hundreds of session requests at once, so the setup scripts raise its connection limits (`/etc/dbus-1/system.d/5cs045-limits.conf`). As a safety net, students are also in the `5cs045-students` group, which caps them at 300 processes at every SSH login (`/etc/security/limits.d/5cs045-students.conf`) even if a session could not be created.
 
 `add-student.sh` applies the limits to new students, and `update-server.sh` applies them to everyone already registered. To apply them again by hand: `sudo ./apply-student-limits.sh` (all students) or `sudo ./apply-student-limits.sh sarayu_gautam`. The values are at the top of `bin/apply-student-limits.sh` (disk, CPU, memory, processes) and `bin/enforce-limits.sh` (database, error log, disk alert).
 

@@ -37,6 +37,9 @@ rm -f /etc/fail2ban/jail.d/5cs045-sshd.conf
 rm -f /etc/systemd/system/php8.3-fpm.service.d/5cs045.conf
 rmdir /etc/systemd/system/php8.3-fpm.service.d 2>/dev/null || true
 rm -f /etc/cron.d/5cs045 /etc/cron.allow /etc/at.allow
+rm -f /etc/dbus-1/system.d/5cs045-limits.conf /etc/security/limits.d/5cs045-students.conf
+systemctl reload dbus 2>/dev/null || true
+groupdel 5cs045-students 2>/dev/null || true
 rm -f /etc/systemd/system/user-*.slice.d/50-5cs045-limits.conf
 rmdir /etc/systemd/system/user-*.slice.d 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true

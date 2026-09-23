@@ -67,5 +67,12 @@ chmod 600 "$CSV"
 echo ""
 echo "Done in $(( $(date +%s) - started ))s: ${created} created, $((COUNT - created - failed)) already existed, ${failed} failed or skipped."
 echo "Passwords: ${CSV}"
-echo "Copy it to the machine that runs the test, for example:"
-echo "  scp ${OWNER}@<this server>:loadtest-accounts.csv ."
+if [[ "$OWNER" == "root" ]]; then
+  # root cannot log in over SSH, so the file has to go to your own login first
+  echo "Copy it to your own login, then to the machine that runs the test:"
+  echo "  cp ${CSV} /home/<your login>/ && chown <your login>: /home/<your login>/loadtest-accounts.csv"
+  echo "  scp <your login>@<this server>:loadtest-accounts.csv ."
+else
+  echo "Copy it to the machine that runs the test, for example:"
+  echo "  scp ${OWNER}@<this server>:loadtest-accounts.csv ."
+fi

@@ -34,6 +34,14 @@ if ! cmp -s "${REPO_ROOT}/templates/php-fpm-systemd.conf" /etc/systemd/system/ph
   FPM_RESTART=1
 fi
 
+# Room on the system bus for a whole class logging in at once. A reload is enough; never restart dbus.
+if ! cmp -s "${REPO_ROOT}/templates/dbus-5cs045-limits.conf" /etc/dbus-1/system.d/5cs045-limits.conf; then
+  install -o root -g root -m 644 "${REPO_ROOT}/templates/dbus-5cs045-limits.conf" /etc/dbus-1/system.d/5cs045-limits.conf
+  systemctl reload dbus
+fi
+getent group 5cs045-students >/dev/null || groupadd 5cs045-students
+install -o root -g root -m 644 "${REPO_ROOT}/templates/limits-5cs045-students.conf" /etc/security/limits.d/5cs045-students.conf
+
 install -o root -g root -m 644 "${REPO_ROOT}/templates/cron-5cs045" /etc/cron.d/5cs045
 echo root > /etc/cron.allow
 echo root > /etc/at.allow
