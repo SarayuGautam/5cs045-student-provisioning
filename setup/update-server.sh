@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs the latest scripts and web files from this repository onto a server that is already set up.
-# It does not touch SMTP settings, student accounts or the phpMyAdmin password.
+# It does not touch SMTP settings or student accounts.
 #
 # Usage: cd /opt/5cs045-provisioning && git pull && sudo ./setup/update-server.sh
 set -euo pipefail

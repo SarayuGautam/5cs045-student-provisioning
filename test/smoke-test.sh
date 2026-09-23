@@ -89,14 +89,9 @@ FOLDER_PAGE="$(curl -k -s "$BASE_URL/~smoketest_b/workshops/" 2>/dev/null)"
 [[ "$FOLDER_PAGE" == *"weekly workshop work"* ]] && ok "an empty folder shows its short description" || bad "an empty folder did not show its description"
 
 echo ""
-echo "=== public registration and admin protection ==="
+echo "=== public registration and phpMyAdmin ==="
 check_code "$BASE_URL/register.php" "200" "registration page is public"
-check_code "$BASE_URL/phpmyadmin/" "401" "phpMyAdmin still requires its Basic Auth login"
-if [[ "$(stat -c '%a' /etc/nginx/.htpasswd-admin 2>/dev/null || echo missing)" == "640" ]]; then
-  ok "phpMyAdmin password file is mode 640"
-else
-  bad "phpMyAdmin password file is not mode 640"
-fi
+check_code "$BASE_URL/phpmyadmin/" "200" "phpMyAdmin login page loads directly (no Basic Auth prompt)"
 
 echo ""
 echo "=== cleaning up test accounts ==="

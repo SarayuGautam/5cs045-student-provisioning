@@ -9,7 +9,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 DEPLOY_ROOT="/usr/local/sbin/5cs045"
-ADMIN_AUTH_FILE="/etc/nginx/.htpasswd-admin"
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -27,7 +26,7 @@ apt-get install -y -qq \
   nginx \
   php8.3-fpm php8.3-mysql php8.3-cli php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip \
   mariadb-server \
-  git composer acl unzip openssh-server phpmyadmin apache2-utils fail2ban sudo curl
+  git composer acl unzip openssh-server phpmyadmin fail2ban sudo curl
 
 echo "==> Creating student directories"
 mkdir -p /srv/students /srv/students-archive
@@ -106,13 +105,6 @@ chown www-data:www-data /var/log/5cs045-registration.log
 chmod 640 /var/log/5cs045-registration.log
 chown root:root /var/log/5cs045-provisioning.log
 chmod 600 /var/log/5cs045-provisioning.log
-
-echo "==> Protecting phpMyAdmin with Basic Auth"
-read -r -p "phpMyAdmin username [student2026]: " AUTH_USER
-AUTH_USER="${AUTH_USER:-student2026}"
-htpasswd -c "${ADMIN_AUTH_FILE}" "$AUTH_USER"
-chown root:www-data "${ADMIN_AUTH_FILE}"
-chmod 640 "${ADMIN_AUTH_FILE}"
 
 nginx -t
 systemctl enable --now nginx php8.3-fpm mariadb ssh fail2ban

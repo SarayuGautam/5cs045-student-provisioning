@@ -42,7 +42,7 @@ cd 5cs045-provisioning
 mysql_secure_installation
 ```
 
-The setup script installs everything and asks you to choose a username and password for the phpMyAdmin page.
+The setup script installs everything. phpMyAdmin has no separate login of its own — students sign in with their own MySQL username and password.
 
 For `mysql_secure_installation`, answer: switch to unix_socket **Y**, change root password **N**, and **Y** to everything else.
 
@@ -195,7 +195,7 @@ git pull
 sudo ./setup/update-server.sh
 ```
 
-This copies the new scripts and pages into place. It does not touch email settings, students or the phpMyAdmin password.
+This copies the new scripts and pages into place. It does not touch email settings or students.
 
 ## Checking the server is healthy
 
@@ -237,7 +237,7 @@ sudo nginx -t
 - The real SMTP password stays only in `/etc/5cs045/smtp_config.php` (owner `root`, group `www-data`, mode `640`). Never commit it or paste it into chat or email.
 - To see a student's saved password: `sudo cat /var/lib/5cs045-credentials/sarayu_gautam`. Only root can read these files.
 - Never commit student passwords or the files in `/var/lib/5cs045-credentials`.
-- The phpMyAdmin password file `/etc/nginx/.htpasswd-admin` also stays mode `640`.
+- phpMyAdmin has no separate password of its own: students log in there with the same username and password they use for SSH and MySQL.
 - The certificate is self-signed. Replace it when the college gives you a proper server name.
 - To remove everything (students, settings, web files): `sudo ./setup/uninstall.sh`.
 
