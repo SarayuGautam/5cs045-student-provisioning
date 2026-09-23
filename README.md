@@ -260,7 +260,7 @@ Adjust the volume group and logical volume names, and the amount to grow by, to 
 
 **The student's website shows 502 or a blank page.** Look at their PHP error log: `sudo tail /srv/students/<username>/.sessions/php-error.log`. If it is a 502, run `sudo systemctl status php8.3-fpm` and check the file `/etc/php/8.3/fpm/pool.d/<username>.conf` exists.
 
-**A student cannot log in over SSH.** Reset their password. Repeated wrong passwords get an address blocked for an hour by fail2ban. To unblock: `sudo fail2ban-client set sshd unbanip <address>`.
+**A student cannot log in over SSH.** Reset their password. Repeated wrong passwords get an address blocked for an hour by fail2ban. To unblock: `sudo fail2ban-client set sshd unbanip <address>`. An address banned three separate times in a day is banned again for a week by the `recidive` jail - unblock that one with `sudo fail2ban-client set recidive unbanip <address>`.
 
 **`composer install` fails on the server.** The server needs internet access to packagist.org. If it is blocked, run `composer install --no-dev` on your laptop instead and upload the whole folder, including `vendor`.
 

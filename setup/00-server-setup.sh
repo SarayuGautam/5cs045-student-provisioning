@@ -62,13 +62,7 @@ cp "${REPO_ROOT}/templates/sshd-students.conf" /etc/ssh/sshd_config.d/50-student
 sshd -t
 
 echo "==> Enabling fail2ban for SSH"
-cat > /etc/fail2ban/jail.d/5cs045-sshd.conf <<-'EOF2'
-	[sshd]
-	enabled = true
-	maxretry = 5
-	findtime = 10m
-	bantime = 1h
-	EOF2
+cp "${REPO_ROOT}/templates/fail2ban-5cs045.conf" /etc/fail2ban/jail.d/5cs045-sshd.conf
 
 echo "==> Deploying sudo rule"
 cp "${REPO_ROOT}/templates/sudoers-5cs045-provisioning" /etc/sudoers.d/5cs045-provisioning
