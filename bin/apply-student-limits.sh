@@ -5,7 +5,10 @@
 # PHP for the websites is limited separately, in the student's PHP pool.
 # Safe to run again at any time.
 #
-# Usage: sudo apply-student-limits.sh [username ...]     (no names = all students)
+# Usage: sudo apply-student-limits.sh [--no-reload] [username ...]     (no names = all students)
+#
+# --no-reload skips "systemctl daemon-reload"; the SSH limits of students who have not logged in
+# yet then only take effect after the caller's own daemon-reload.
 set -euo pipefail
 
 STUDENT_ROOT="/srv/students"
@@ -21,6 +24,12 @@ LOG_FILE="/var/log/5cs045-provisioning.log"
 
 log() { echo "[$(date -Is)] $*" | tee -a "$LOG_FILE" >&2; }
 [[ $EUID -eq 0 ]] || { echo "ERROR: run this with sudo" >&2; exit 1; }
+
+RELOAD=1
+if [[ "${1:-}" == "--no-reload" ]]; then
+  RELOAD=0
+  shift
+fi
 
 if [[ $# -gt 0 ]]; then
   USERS=("$@")
@@ -65,7 +74,7 @@ for user in "${USERS[@]}"; do
 done
 
 # One reload for the whole batch. It also applies the limits to students who are logged in right now.
-if [[ "$applied" -gt 0 ]] && [[ -d /run/systemd/system ]]; then
+if [[ "$applied" -gt 0 && "$RELOAD" -eq 1 ]] && [[ -d /run/systemd/system ]]; then
   systemctl daemon-reload
 fi
 echo "Limits applied to ${applied} student(s)."

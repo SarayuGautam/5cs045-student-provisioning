@@ -224,6 +224,56 @@ systemctl status nginx php8.3-fpm mariadb ssh fail2ban --no-pager
 sudo nginx -t
 ```
 
+## Load testing (SSH and SCP)
+
+Checks how many students can log in and upload at the same time. Run it before a semester or in a quiet window, never while students are working: at full size it deliberately pushes the server as hard as a whole cohort would.
+
+**1. Create throwaway accounts on the server.** They are real accounts (user, folders, database, PHP pool, limits), named `loadtest_001` upwards. About a second each, so 800 take around 15 minutes. The passwords go into `loadtest-accounts.csv` in your home folder.
+
+```bash
+cd /opt/5cs045-provisioning
+sudo ./test/loadtest/create-accounts.sh 800
+```
+
+**2. Pick a test machine.** Any other computer on the campus network with Python 3 (Linux, macOS or Windows). Not the server itself, because the test would compete with the server for CPU. Copy the passwords file to it, for example `scp <you>@<server>:loadtest-accounts.csv .`
+
+**3. Stop fail2ban banning the test machine.** Hundreds of logins from one address look like an attack. This lasts until fail2ban restarts.
+
+```bash
+sudo fail2ban-client set sshd addignoreip <test machine IP>
+sudo fail2ban-client set recidive addignoreip <test machine IP>
+```
+
+**4. Watch the server.** In a second SSH window on the server run `sudo ./test/loadtest/monitor.sh`. Press Ctrl-C after each test run to see the worst moments (CPU, memory, swap, refused connections).
+
+**5. Run the test on the test machine**, from a copy of this repository:
+
+```bash
+python3 -m pip install asyncssh
+python3 test/loadtest/ssh_load.py <server IP> loadtest-accounts.csv --scenario login --users 100
+```
+
+Go up in steps (`--users 100`, `200`, `400`, `800`) so you can see where it starts to struggle. The scenarios:
+
+| Scenario | What each student does |
+|---|---|
+| `login` | Logs in and keeps a terminal open for `--hold` seconds (default 60), running a command every 10 seconds |
+| `upload` | Uploads a `--file-size` MB file (default 5) and, with `--project demo-student-portfolio-blade`, the demo site. Modern `scp` uses the same protocol |
+| `lab` | Both: logs in, keeps the terminal open, uploads, and checks the uploaded PHP |
+
+`--ramp 60` spreads the logins over a minute, like a real class arriving. Without it, everyone connects in the same second, which is the worst case.
+
+A healthy result: every student succeeds, the median login is a few seconds, free memory never gets close to zero, no swap is used, and the monitor reports no MaxStartups throttling. The script lists the reason for every failure, and saves a line per student to a CSV.
+
+**6. Clean up.**
+
+```bash
+sudo /usr/local/sbin/5cs045/bin/remove-all-students.sh --prefix loadtest_ --yes
+sudo fail2ban-client set sshd delignoreip <test machine IP>
+sudo fail2ban-client set recidive delignoreip <test machine IP>
+rm ~/loadtest-accounts.csv
+```
+
 ## Resource limits
 
 Every student gets these limits automatically, so one account cannot fill the disk or slow the server down for everyone else:
@@ -331,6 +381,7 @@ setup/uninstall.sh              Remove everything
 templates/                      nginx, PHP, SSH, fail2ban and cron settings used by the scripts
 test/smoke-test.sh              Security and isolation check
 test/smtp-test.php              Send one test email
+test/loadtest/                  SSH/SCP load test: accounts, load generator, server monitor
 web/                            Registration page and email code
 demo-student-portfolio-blade/   Example website for students to deploy
 docs/Server_Access_Guide.docx   Guide for students

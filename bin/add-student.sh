@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Creates one student account: Linux user, three web folders, database and PHP pool.
 #
-# Usage: sudo add-student.sh -u sarayu_gautam [-n "Full Name"] [-e email] [-d]
+# Usage: sudo add-student.sh -u sarayu_gautam [-n "Full Name"] [-e email] [-d] [-R]
 #
 # -e records the email so the registration page will not create a second account for it.
 # -d reloads PHP 10 seconds later instead of straight away. The registration page uses it,
 #    because reloading PHP would otherwise cut off the page that is running this script.
+# -R does not reload PHP or systemd at all. For creating many accounts in a row: the caller
+#    reloads once at the end (test/loadtest/create-accounts.sh does).
 # The script prints the password once. A copy is kept for the admin in
 # /var/lib/5cs045-credentials/<username> (root only, the student cannot see or change it).
 # The same password works for SSH, SCP and MySQL.
@@ -26,13 +28,15 @@ USERNAME=""
 FULLNAME=""
 EMAIL=""
 DELAY_RELOAD=0
-while getopts "u:n:e:dh" opt; do
+SKIP_RELOAD=0
+while getopts "u:n:e:dRh" opt; do
   case "$opt" in
     u) USERNAME="$OPTARG" ;;
     n) FULLNAME="$OPTARG" ;;
     e) EMAIL="$OPTARG" ;;
     d) DELAY_RELOAD=1 ;;
-    h) echo "Usage: $0 -u <username> [-n \"Full Name\"] [-e email] [-d]"; exit 0 ;;
+    R) SKIP_RELOAD=1 ;;
+    h) echo "Usage: $0 -u <username> [-n \"Full Name\"] [-e email] [-d] [-R]"; exit 0 ;;
     *) exit 1 ;;
   esac
 done
@@ -80,7 +84,9 @@ for private in .ssh .sessions; do
 done
 
 # Disk quota and SSH CPU/memory/process limits, so one account cannot slow down or fill the server
-"$(dirname "$0")/apply-student-limits.sh" "$USERNAME" >/dev/null
+LIMIT_ARGS=()
+[[ "$SKIP_RELOAD" -eq 1 ]] && LIMIT_ARGS+=(--no-reload)
+"$(dirname "$0")/apply-student-limits.sh" "${LIMIT_ARGS[@]}" "$USERNAME" >/dev/null
 
 # Database, named like the username, with the same password.
 # In GRANT an underscore means "any character", so it is escaped to keep the student inside their own database.
@@ -113,7 +119,9 @@ sed \
   -e "s#{{WEB_GROUP}}#${WEB_GROUP}#g" \
   "$POOL_TEMPLATE" > "${FPM_POOL_DIR}/${USERNAME}.conf"
 php-fpm${PHP_VERSION} -t >/dev/null 2>&1 || die "the PHP pool config is invalid, see: php-fpm${PHP_VERSION} -t"
-if [[ "$DELAY_RELOAD" -eq 1 ]]; then
+if [[ "$SKIP_RELOAD" -eq 1 ]]; then
+  :   # the caller reloads PHP once, after the last account
+elif [[ "$DELAY_RELOAD" -eq 1 ]]; then
   systemd-run --quiet --collect --on-active=10s systemctl reload "php${PHP_VERSION}-fpm" >/dev/null 2>&1 \
     || (setsid bash -c "sleep 10; systemctl reload php${PHP_VERSION}-fpm" >/dev/null 2>&1 </dev/null &)
 else

@@ -107,9 +107,14 @@ chmod 640 /var/log/5cs045-registration.log
 chown root:root /var/log/5cs045-provisioning.log
 chmod 600 /var/log/5cs045-provisioning.log
 
+echo "==> Raising the PHP open-file limit (one pool per student)"
+install -D -o root -g root -m 644 "${REPO_ROOT}/templates/php-fpm-systemd.conf" /etc/systemd/system/php8.3-fpm.service.d/5cs045.conf
+systemctl daemon-reload
+
 nginx -t
 systemctl enable --now nginx php8.3-fpm mariadb ssh fail2ban
-systemctl reload nginx php8.3-fpm
+systemctl reload nginx
+systemctl restart php8.3-fpm
 
 echo ""
 echo "============================================================"

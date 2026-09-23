@@ -111,6 +111,13 @@ elif [[ "$CRON_OUT" == *"not allowed"* ]]; then
 else
   bad "students can use cron (crontab said: ${CRON_OUT//$'\n'/ })"
 fi
+FPM_LIMIT="$(awk '/Max open files/{ print $4 }' "/proc/$(cat /run/php/php8.3-fpm.pid 2>/dev/null)/limits" 2>/dev/null)"
+[[ "${FPM_LIMIT:-0}" =~ ^[0-9]+$ ]] && (( FPM_LIMIT >= 65536 )) \
+  && ok "PHP can keep enough files open for 800+ student pools" \
+  || bad "PHP's open-file limit is ${FPM_LIMIT:-unknown} (needs 65536; restart php8.3-fpm)"
+[[ "$(sshd -T 2>/dev/null | awk '$1 == "maxstartups" { print $2 }')" == "1000:30:1500" ]] \
+  && ok "sshd accepts a whole lab logging in at once" \
+  || bad "sshd MaxStartups is not 1000:30:1500, so mass logins get dropped"
 [[ -f /etc/cron.d/5cs045 ]] && "$DEPLOY_ROOT/bin/enforce-limits.sh" \
   && ok "the limits job is scheduled and runs cleanly" || bad "the limits job is missing or failed"
 

@@ -26,6 +26,14 @@ cp "${REPO_ROOT}/templates/sshd-students.conf" /etc/ssh/sshd_config.d/50-student
 sshd -t
 cp "${REPO_ROOT}/templates/fail2ban-5cs045.conf" /etc/fail2ban/jail.d/5cs045-sshd.conf
 
+# PHP's open-file limit only changes on a restart, so restart only when the setting changed
+FPM_RESTART=0
+if ! cmp -s "${REPO_ROOT}/templates/php-fpm-systemd.conf" /etc/systemd/system/php8.3-fpm.service.d/5cs045.conf; then
+  install -D -o root -g root -m 644 "${REPO_ROOT}/templates/php-fpm-systemd.conf" /etc/systemd/system/php8.3-fpm.service.d/5cs045.conf
+  systemctl daemon-reload
+  FPM_RESTART=1
+fi
+
 install -o root -g root -m 644 "${REPO_ROOT}/templates/cron-5cs045" /etc/cron.d/5cs045
 echo root > /etc/cron.allow
 echo root > /etc/at.allow
@@ -44,7 +52,12 @@ done
 "${DEPLOY_ROOT}/bin/apply-student-limits.sh" >/dev/null
 
 nginx -t
-systemctl reload nginx php8.3-fpm
+systemctl reload nginx
+if [[ "$FPM_RESTART" -eq 1 ]]; then
+  systemctl restart php8.3-fpm   # a second or two of 502s on student sites
+else
+  systemctl reload php8.3-fpm
+fi
 # SSH and fail2ban read their settings only at (re)start. try-reload leaves a stopped service alone.
 systemctl try-reload-or-restart ssh fail2ban
 echo "Server updated."

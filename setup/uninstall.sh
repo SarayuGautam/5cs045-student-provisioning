@@ -34,6 +34,8 @@ rm -f /etc/nginx/.htpasswd-admin /etc/nginx/.htpasswd-register
 rm -f /etc/ssh/sshd_config.d/50-students.conf
 rm -f /etc/sudoers.d/5cs045-provisioning
 rm -f /etc/fail2ban/jail.d/5cs045-sshd.conf
+rm -f /etc/systemd/system/php8.3-fpm.service.d/5cs045.conf
+rmdir /etc/systemd/system/php8.3-fpm.service.d 2>/dev/null || true
 rm -f /etc/cron.d/5cs045 /etc/cron.allow /etc/at.allow
 rm -f /etc/systemd/system/user-*.slice.d/50-5cs045-limits.conf
 rmdir /etc/systemd/system/user-*.slice.d 2>/dev/null || true

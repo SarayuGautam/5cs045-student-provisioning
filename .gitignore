@@ -11,3 +11,8 @@ credentials.txt
 # Demo portfolio
 demo-student-portfolio-blade/vendor/
 demo-student-portfolio-blade/config.php
+
+# Load test output (contains throwaway passwords)
+loadtest-accounts.csv
+loadtest-*.csv
+__pycache__/
