@@ -91,16 +91,26 @@ FOLDER_PAGE="$(curl -k -s "$BASE_URL/~smoketest_b/workshops/" 2>/dev/null)"
 echo ""
 echo "=== resource limit checks ==="
 UID_A="$(id -u smoketest_a)"
-if quotaon -p /srv/students &>/dev/null; then
-  quota -vu smoketest_a 2>/dev/null | grep -q 512000 \
+QUOTA_MOUNT="$(df --output=target /srv/students | tail -1)"
+if [[ "$(quotaon -pu "$QUOTA_MOUNT" 2>/dev/null)" == *" is on" ]]; then
+  QUOTA_OUT="$(quota -vu smoketest_a 2>&1)"
+  [[ "$QUOTA_OUT" == *512000* ]] \
     && ok "new student has the 500 MB disk quota" || bad "new student has no disk quota"
 else
   echo "  SKIPPED: disk quotas are not enabled (see \"Resource limits\" in README.md)"
 fi
 [[ "$(systemctl show "user-${UID_A}.slice" -p TasksMax --value 2>/dev/null)" == "200" ]] \
   && ok "new student has the SSH process limit" || bad "new student has no SSH process limit"
-su - smoketest_a -s /bin/bash -c 'crontab -l' 2>&1 | grep -qi "not allowed" \
-  && ok "students cannot use cron" || bad "students can use cron (their jobs would escape the limits)"
+# Captured first rather than piped into grep: crontab exits 1 when it refuses, and with pipefail
+# that failure would count against the check even though the refusal is what we want.
+CRON_OUT="$(su - smoketest_a -s /bin/bash -c 'crontab -l' 2>&1)"
+if ! command -v crontab >/dev/null; then
+  ok "students cannot use cron (cron is not installed)"
+elif [[ "$CRON_OUT" == *"not allowed"* ]]; then
+  ok "students cannot use cron"
+else
+  bad "students can use cron (crontab said: ${CRON_OUT//$'\n'/ })"
+fi
 [[ -f /etc/cron.d/5cs045 ]] && "$DEPLOY_ROOT/bin/enforce-limits.sh" \
   && ok "the limits job is scheduled and runs cleanly" || bad "the limits job is missing or failed"
 

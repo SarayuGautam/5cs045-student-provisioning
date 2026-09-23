@@ -31,8 +31,12 @@ else
   done
 fi
 
+# Quotas are set on the filesystem that holds the student folders (usually /), not on the folder itself.
+# "quotaon -p" exits 0 whether quotas are on or off, so its message is what tells us.
+QUOTA_MOUNT="$(df --output=target "$STUDENT_ROOT" 2>/dev/null | tail -1)"
 QUOTAS_ON=0
-if command -v setquota &>/dev/null && quotaon -p "$STUDENT_ROOT" &>/dev/null; then
+QUOTA_STATE="$(quotaon -pu "$QUOTA_MOUNT" 2>/dev/null || true)"
+if command -v setquota &>/dev/null && [[ "$QUOTA_STATE" == *" is on" ]]; then
   QUOTAS_ON=1
 else
   log "WARNING: disk quotas are not enabled on ${STUDENT_ROOT}; students have no disk cap (see \"Resource limits\" in README.md)"
@@ -44,7 +48,7 @@ for user in "${USERS[@]}"; do
   uid="$(id -u "$user")"
 
   if [[ "$QUOTAS_ON" -eq 1 ]]; then
-    setquota -u "$user" "$QUOTA_KB" "$QUOTA_KB" 0 0 "$STUDENT_ROOT" || log "WARNING: could not set the disk quota for ${user}"
+    setquota -u "$user" "$QUOTA_KB" "$QUOTA_KB" 0 0 "$QUOTA_MOUNT" || log "WARNING: could not set the disk quota for ${user}"
   fi
 
   # SSH logins run inside the user's systemd slice (user-<uid>.slice), so the limits go there.
