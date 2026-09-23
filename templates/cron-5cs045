@@ -1,0 +1,5 @@
+# Installed as /etc/cron.d/5cs045 by the setup scripts.
+# Every 15 minutes: trim oversized student PHP error logs, cap student databases at 100 MB,
+# and email the admin if the disk is 80% full. See bin/enforce-limits.sh.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+*/15 * * * * root /usr/local/sbin/5cs045/bin/enforce-limits.sh

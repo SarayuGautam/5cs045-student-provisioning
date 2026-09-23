@@ -34,8 +34,12 @@ rm -f /etc/nginx/.htpasswd-admin /etc/nginx/.htpasswd-register
 rm -f /etc/ssh/sshd_config.d/50-students.conf
 rm -f /etc/sudoers.d/5cs045-provisioning
 rm -f /etc/fail2ban/jail.d/5cs045-sshd.conf
+rm -f /etc/cron.d/5cs045 /etc/cron.allow /etc/at.allow
+rm -f /etc/systemd/system/user-*.slice.d/50-5cs045-limits.conf
+rmdir /etc/systemd/system/user-*.slice.d 2>/dev/null || true
+systemctl daemon-reload 2>/dev/null || true
 rm -rf /etc/5cs045
-rm -rf /var/lib/5cs045-ratelimit /var/lib/5cs045-ip-ratelimit /var/lib/5cs045-registration-locks /var/lib/5cs045-registrations
+rm -rf /var/lib/5cs045-ratelimit /var/lib/5cs045-ip-ratelimit /var/lib/5cs045-registration-locks /var/lib/5cs045-registrations /var/lib/5cs045-db-over /var/lib/5cs045-disk-alert-sent
 rm -f /var/log/5cs045-registration.log /var/log/5cs045-provisioning.log
 rm -f /var/www/html/index.php /var/www/html/register_handler.php
 rm -rf /var/www/html/lib

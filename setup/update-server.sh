@@ -26,6 +26,11 @@ cp "${REPO_ROOT}/templates/sshd-students.conf" /etc/ssh/sshd_config.d/50-student
 sshd -t
 cp "${REPO_ROOT}/templates/fail2ban-5cs045.conf" /etc/fail2ban/jail.d/5cs045-sshd.conf
 
+install -o root -g root -m 644 "${REPO_ROOT}/templates/cron-5cs045" /etc/cron.d/5cs045
+echo root > /etc/cron.allow
+echo root > /etc/at.allow
+install -d -o root -g root -m 700 /var/lib/5cs045-db-over
+
 # Move old credentials.txt files out of the students' homes (students could edit them)
 install -d -o root -g root -m 700 /var/lib/5cs045-credentials
 for old in /srv/students/*/credentials.txt; do
@@ -36,7 +41,10 @@ for old in /srv/students/*/credentials.txt; do
 done
 
 "${DEPLOY_ROOT}/bin/refresh-student-folders.sh" >/dev/null
+"${DEPLOY_ROOT}/bin/apply-student-limits.sh" >/dev/null
 
 nginx -t
 systemctl reload nginx php8.3-fpm
+# SSH and fail2ban read their settings only at (re)start. try-reload leaves a stopped service alone.
+systemctl try-reload-or-restart ssh fail2ban
 echo "Server updated."

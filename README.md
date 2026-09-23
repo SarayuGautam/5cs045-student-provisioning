@@ -9,6 +9,7 @@ Every command below is run on the server, over SSH, unless it says otherwise.
 - A login (username and password). The same password works for SSH, SCP and MySQL.
 - Three website folders: `workshops`, `exam` and `assessment`.
 - One database, with the same name as the username.
+- 500 MB of disk space and a 100 MB database (see "Resource limits").
 - Three websites:
   - `https://<server>/~<username>/workshops/` for weekly work. The student makes one folder per week, for example `workshops/week1`.
   - `https://<server>/~<username>/assessment/` for the assessment project (one project).
@@ -66,6 +67,7 @@ Fill in:
 | use_starttls | Keep `true` for port 587 |
 | allowed_email_domain | Only emails ending in this can register |
 | server_url | The address students use, for example `https://10.80.0.250` |
+| admin_email | Where server alerts go (disk 80% full). Leave empty for no alerts |
 
 Send yourself a test email:
 
@@ -74,6 +76,8 @@ sudo php /opt/5cs045-provisioning/test/smtp-test.php your.name@heraldcollege.edu
 ```
 
 If it fails, the error message says what went wrong (wrong password, server unreachable, and so on).
+
+On a server set up before `admin_email` existed, add the line yourself: `'admin_email' => 'you@heraldcollege.edu.np',`
 
 `web/smtp_config.example.php` in this repository is only a template. Never put the real password in it.
 
@@ -129,6 +133,14 @@ sudo ./remove-student.sh -u sarayu_gautam
 ```
 
 After removal the student can register again with the same email.
+
+### Remove everyone (end of semester)
+
+```bash
+sudo ./remove-all-students.sh
+```
+
+It asks you to type `DELETE` and the number of students before it does anything. `--prefix loadtest_` only removes usernames that start with `loadtest_`, which is handy for clearing out test accounts.
 
 ### See all students
 
@@ -212,28 +224,45 @@ systemctl status nginx php8.3-fpm mariadb ssh fail2ban --no-pager
 sudo nginx -t
 ```
 
-## Disk quotas
+## Resource limits
 
-Each student is capped at 500 MB. This is a hard Linux disk quota keyed to the student's own account, applied automatically the moment `add-student.sh` creates them - not something the application enforces, so it holds even over SCP/SFTP, not just the website. Once a student reaches it, further writes fail immediately with "Disk quota exceeded" until they free up space.
+Every student gets these limits automatically, so one account cannot fill the disk or slow the server down for everyone else:
 
-This requires quota accounting to be turned on for the filesystem that holds `/srv/students` - it is a one-time, per-server setup step, not something `00-server-setup.sh` does automatically (server disk layouts vary too much to script safely). To enable it:
+| Limit | Value | What happens when it is reached |
+|---|---|---|
+| Disk (website files, uploads, anything in their home) | 500 MB | Writes fail with "Disk quota exceeded" |
+| Database | 100 MB | Checked every 15 minutes. Over the limit, the database becomes read and delete only ("INSERT command denied"). Full access comes back by itself once it is under 100 MB again |
+| Programs run over SSH | 1 CPU core, 1 GB memory, 200 processes | The program is slowed down, or stopped if it runs out of memory |
+| PHP for their websites | 4 workers, 128 MB and 30 seconds per request | The request fails |
+| PHP error log (`.sessions/php-error.log`) | 5 MB | Cut down to its last 1 MB, so a noisy bug cannot eat the disk quota |
+
+Students cannot use `cron` or `at`: those jobs would run outside the limits. Only root can schedule jobs, so use `sudo crontab -e` for your own.
+
+`add-student.sh` applies the limits to new students, and `update-server.sh` applies them to everyone already registered. To apply them again by hand: `sudo ./apply-student-limits.sh` (all students) or `sudo ./apply-student-limits.sh sarayu_gautam`. The values are at the top of `bin/apply-student-limits.sh` (disk, CPU, memory, processes) and `bin/enforce-limits.sh` (database, error log, disk alert).
+
+`enforce-limits.sh` runs every 15 minutes (`/etc/cron.d/5cs045`) and writes what it did to `/var/log/5cs045-provisioning.log`. It also emails `admin_email` (see "Email settings") when the disk is 80% full, at most once a day.
+
+To see or change one student's disk use and limit:
+
+```bash
+sudo quota -vu sarayu_gautam
+sudo setquota -u sarayu_gautam 1024000 1024000 0 0 /   # in 1K blocks; 1024000 = 1 GB
+```
+
+A change made by hand like this lasts until the next `update-server.sh` or `apply-student-limits.sh`, which put back the standard 500 MB.
+
+### Turning on disk quotas (once per server)
+
+The disk quota needs quota accounting on the filesystem that holds `/srv/students`. `00-server-setup.sh` does not do this, because disk layouts differ between servers. Until it is on, accounts are still created, and a warning is logged that they have no disk cap.
 
 ```bash
 sudo apt-get install -y quota
-# Add usrquota,grpquota to the root filesystem's line in /etc/fstab, then:
+# In /etc/fstab, add usrquota,grpquota to the options of the / line, then:
 sudo mount -o remount /
 sudo quotacheck -cum /
 sudo quotaon /
+sudo /usr/local/sbin/5cs045/bin/apply-student-limits.sh
 ```
-
-To check a student's current usage against their cap, or change it:
-
-```bash
-sudo quota -u sarayu_gautam
-sudo setquota -u sarayu_gautam 512000 512000 0 0 /   # numbers are in 1K blocks; 512000 = 500 MB
-```
-
-If quotas are not enabled yet, `add-student.sh` still creates the account - it just logs a warning that the new student has no cap, instead of failing.
 
 ### Growing the disk
 
@@ -249,6 +278,10 @@ df -h /
 Adjust the volume group and logical volume names, and the amount to grow by, to match `sudo vgs` / `sudo lvs` on your server.
 
 ## Common problems
+
+**A student gets "Disk quota exceeded".** They have used their 500 MB. `sudo quota -vu <username>` shows their use. They need to delete files (big images and videos are the usual cause), or you can raise their limit (see "Resource limits").
+
+**A student's site says "INSERT command denied".** Their database is over 100 MB, so it is read and delete only. Dropping tables they do not need frees the space straight away. Deleting rows does not always shrink the files, so after a large delete run `sudo mysqlcheck --optimize <username>`. Full access comes back within 15 minutes of being under the limit.
 
 **The registration page says "could not send the email".** The account was created but the email failed. Fix the email settings (run the SMTP test), then run `resend-credentials.php` for that student.
 
@@ -288,10 +321,14 @@ bin/reset-student-password.sh   New password for a student
 bin/resend-credentials.php      Email a student their details again
 bin/list-students.sh            List students
 bin/refresh-student-folders.sh  Fix folder permissions and add the short note pages
+bin/apply-student-limits.sh     Disk quota and SSH CPU/memory/process limits
+bin/enforce-limits.sh           Every 15 min: database cap, error log trim, disk alert
+bin/send-admin-alert.php        Email the admin (used by enforce-limits.sh)
+bin/remove-all-students.sh      Remove every student, or every one with a name prefix
 setup/00-server-setup.sh        First-time setup
 setup/update-server.sh          Install new files on a working server
 setup/uninstall.sh              Remove everything
-templates/                      nginx, PHP and SSH settings used by the scripts
+templates/                      nginx, PHP, SSH, fail2ban and cron settings used by the scripts
 test/smoke-test.sh              Security and isolation check
 test/smtp-test.php              Send one test email
 web/                            Registration page and email code

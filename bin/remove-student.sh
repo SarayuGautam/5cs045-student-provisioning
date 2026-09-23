@@ -3,7 +3,10 @@
 # This permanently deletes the student's files - there is no backup.
 # The student's email is also forgotten, so they can register again.
 #
-# Usage: sudo remove-student.sh -u sarayu_gautam
+# Usage: sudo remove-student.sh -u sarayu_gautam [--no-reload]
+#
+# --no-reload skips reloading PHP and systemd. remove-all-students.sh uses it and reloads
+# once at the end, instead of once per student.
 set -euo pipefail
 
 PHP_VERSION="8.3"
@@ -11,10 +14,12 @@ REGISTRY_DIR="/var/lib/5cs045-registrations"
 USERNAME_RE='^[a-z][a-z0-9_]{2,31}$'
 
 USERNAME=""
+RELOAD=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -u) USERNAME="$2"; shift 2 ;;
-    -h) echo "Usage: $0 -u <username>"; exit 0 ;;
+    --no-reload) RELOAD=0; shift ;;
+    -h) echo "Usage: $0 -u <username> [--no-reload]"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -27,9 +32,12 @@ id "$USERNAME" &>/dev/null || die "no such user: $USERNAME"
 
 HOME_DIR="$(getent passwd "$USERNAME" | cut -d: -f6)"
 [[ "$HOME_DIR" == /srv/students/* ]] || die "$USERNAME is not a student account (home is $HOME_DIR)"
+STUDENT_UID="$(id -u "$USERNAME")"
 
 rm -f "/etc/php/${PHP_VERSION}/fpm/pool.d/${USERNAME}.conf" "/run/php/php${PHP_VERSION}-fpm-${USERNAME}.sock"
-systemctl reload "php${PHP_VERSION}-fpm"
+if [[ "$RELOAD" -eq 1 ]]; then
+  systemctl reload "php${PHP_VERSION}-fpm"
+fi
 
 mysql -e "DROP DATABASE IF EXISTS \`${USERNAME}\`; DROP USER IF EXISTS '${USERNAME}'@'localhost'; FLUSH PRIVILEGES;"
 
@@ -41,6 +49,13 @@ if [[ -d "$REGISTRY_DIR" ]]; then
   grep -l "\"username\":\"${USERNAME}\"" "$REGISTRY_DIR"/* 2>/dev/null | xargs -r rm -f
 fi
 
-rm -f "/var/lib/5cs045-credentials/${USERNAME}"
+rm -f "/var/lib/5cs045-credentials/${USERNAME}" "/var/lib/5cs045-db-over/${USERNAME}"
+
+# The SSH limits written by apply-student-limits.sh (the disk quota goes with the account)
+rm -f "/etc/systemd/system/user-${STUDENT_UID}.slice.d/50-5cs045-limits.conf"
+rmdir "/etc/systemd/system/user-${STUDENT_UID}.slice.d" 2>/dev/null || true
+if [[ "$RELOAD" -eq 1 ]] && [[ -d /run/systemd/system ]]; then
+  systemctl daemon-reload
+fi
 
 echo "${USERNAME} removed."

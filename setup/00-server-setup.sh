@@ -64,6 +64,13 @@ sshd -t
 echo "==> Enabling fail2ban for SSH"
 cp "${REPO_ROOT}/templates/fail2ban-5cs045.conf" /etc/fail2ban/jail.d/5cs045-sshd.conf
 
+echo "==> Scheduling the limits job, and blocking cron for students"
+install -o root -g root -m 644 "${REPO_ROOT}/templates/cron-5cs045" /etc/cron.d/5cs045
+# Jobs from cron and at would run outside the per-student CPU and memory limits, so only root may use them
+echo root > /etc/cron.allow
+echo root > /etc/at.allow
+install -d -o root -g root -m 700 /var/lib/5cs045-db-over
+
 echo "==> Deploying sudo rule"
 cp "${REPO_ROOT}/templates/sudoers-5cs045-provisioning" /etc/sudoers.d/5cs045-provisioning
 chmod 440 /etc/sudoers.d/5cs045-provisioning

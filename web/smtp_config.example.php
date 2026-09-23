@@ -13,4 +13,6 @@ return [
     'use_starttls' => true,
     'allowed_email_domain' => 'example.edu',
     'server_url' => 'https://server.example.edu',
+    // Where server alerts go (for example "disk 80% full"). Leave empty for no alerts.
+    'admin_email' => '',
 ];

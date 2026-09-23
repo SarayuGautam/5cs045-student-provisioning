@@ -89,6 +89,22 @@ FOLDER_PAGE="$(curl -k -s "$BASE_URL/~smoketest_b/workshops/" 2>/dev/null)"
 [[ "$FOLDER_PAGE" == *"weekly workshop work"* ]] && ok "an empty folder shows its short description" || bad "an empty folder did not show its description"
 
 echo ""
+echo "=== resource limit checks ==="
+UID_A="$(id -u smoketest_a)"
+if quotaon -p /srv/students &>/dev/null; then
+  quota -vu smoketest_a 2>/dev/null | grep -q 512000 \
+    && ok "new student has the 500 MB disk quota" || bad "new student has no disk quota"
+else
+  echo "  SKIPPED: disk quotas are not enabled (see \"Resource limits\" in README.md)"
+fi
+[[ "$(systemctl show "user-${UID_A}.slice" -p TasksMax --value 2>/dev/null)" == "200" ]] \
+  && ok "new student has the SSH process limit" || bad "new student has no SSH process limit"
+su - smoketest_a -s /bin/bash -c 'crontab -l' 2>&1 | grep -qi "not allowed" \
+  && ok "students cannot use cron" || bad "students can use cron (their jobs would escape the limits)"
+[[ -f /etc/cron.d/5cs045 ]] && "$DEPLOY_ROOT/bin/enforce-limits.sh" \
+  && ok "the limits job is scheduled and runs cleanly" || bad "the limits job is missing or failed"
+
+echo ""
 echo "=== public registration and phpMyAdmin ==="
 check_code "$BASE_URL/" "200" "registration page is public at the site root"
 check_code "$BASE_URL/register.php" "301" "old /register.php URL redirects to the new site root"
