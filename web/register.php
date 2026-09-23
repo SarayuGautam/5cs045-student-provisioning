@@ -189,6 +189,10 @@ button {
     padding: 0 18px;
     font: 600 15px 'Poppins', sans-serif;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
     transition: background .15s ease, transform .15s ease, box-shadow .15s ease;
     box-shadow: 0 10px 24px rgba(114, 191, 61, 0.20);
 }
@@ -200,6 +204,32 @@ button:hover {
 
 button:active {
     transform: translateY(1px);
+}
+
+button:disabled {
+    cursor: not-allowed;
+    background: var(--green-dark);
+    opacity: 0.9;
+    transform: none;
+}
+
+.spinner {
+    display: none;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    border: 2.5px solid rgba(255, 255, 255, 0.45);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+button.loading .spinner {
+    display: inline-block;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 @media (max-width: 700px) {
@@ -293,10 +323,36 @@ button:active {
                     autofocus
                 >
 
-                <button type="submit">Register</button>
+                <button type="submit" id="submitBtn">
+                    <span class="btn-label">Register</span>
+                    <span class="spinner" aria-hidden="true"></span>
+                </button>
             </form>
         </div>
     </main>
 </div>
+<script>
+(function () {
+    var form = document.querySelector('form');
+    var btn = document.getElementById('submitBtn');
+    if (!form || !btn) return;
+
+    form.addEventListener('submit', function () {
+        if (btn.classList.contains('loading')) return;
+        btn.classList.add('loading');
+        btn.disabled = true;
+    });
+
+    // If the user comes back to this page via the browser's back button,
+    // the browser can restore the old (disabled/loading) button state
+    // from cache. Reset it so the form is usable again.
+    window.addEventListener('pageshow', function (event) {
+        if (event.persisted) {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    });
+})();
+</script>
 </body>
 </html>
