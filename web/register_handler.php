@@ -19,6 +19,16 @@ const LOCK_DIR = '/var/lib/5cs045-registration-locks';
 const REGISTRY_DIR = '/var/lib/5cs045-registrations';
 const RATE_LIMIT_SECONDS = 300;
 
+// The per-email lock above stops one address from being spammed, but does
+// nothing to stop one visitor from working through many different
+// (real or guessed) addresses in a row - each one still fully provisions a
+// Linux account, database and PHP-FPM pool. This caps that per source IP.
+// The limit is deliberately generous: a whole class can be behind the same
+// campus NAT during a lab session, and that is normal, legitimate traffic.
+const IP_RATE_LIMIT_DIR = '/var/lib/5cs045-ip-ratelimit';
+const IP_RATE_LIMIT_MAX_ATTEMPTS = 40;
+const IP_RATE_LIMIT_WINDOW_SECONDS = 900; // 15 minutes
+
 function respond_and_redirect(bool $ok, string $message): never {
     $_SESSION['register_result'] = ['ok' => $ok, 'message' => $message];
     header('Location: /', true, 303);
@@ -51,6 +61,42 @@ function mark_registered(string $email, string $username, string $status = 'comp
 function id_exists(string $username): bool {
     exec('id ' . escapeshellarg($username) . ' >/dev/null 2>&1', $unused, $code);
     return $code === 0;
+}
+
+// Returns true if this IP has already made IP_RATE_LIMIT_MAX_ATTEMPTS (or
+// more) registration attempts within the trailing window, and records this
+// attempt either way. Keyed by IP, not email, so it catches a single source
+// working through many different addresses - something the per-email lock
+// cannot see.
+function ip_rate_limited(string $ip): bool {
+    if ($ip === '' || $ip === 'unknown') {
+        // No usable IP to key on (e.g. REMOTE_ADDR missing) - fail open
+        // rather than block legitimate traffic on a value we don't have.
+        return false;
+    }
+    @mkdir(IP_RATE_LIMIT_DIR, 0700, true);
+    $file = IP_RATE_LIMIT_DIR . '/' . hash('sha256', $ip);
+    $now = time();
+
+    $attempts = [];
+    $raw = @file_get_contents($file);
+    if ($raw !== false && $raw !== '') {
+        foreach (explode("\n", trim($raw)) as $line) {
+            $t = (int) $line;
+            if ($t > 0 && ($now - $t) < IP_RATE_LIMIT_WINDOW_SECONDS) {
+                $attempts[] = $t;
+            }
+        }
+    }
+
+    if (count($attempts) >= IP_RATE_LIMIT_MAX_ATTEMPTS) {
+        return true;
+    }
+
+    $attempts[] = $now;
+    @file_put_contents($file, implode("\n", $attempts), LOCK_EX);
+    @chmod($file, 0600);
+    return false;
 }
 
 function acquire_request_lock(string $email): ?string {
@@ -117,6 +163,12 @@ if (already_registered($email)) {
 
 if (id_exists($username)) {
     respond_and_redirect(false, 'An account already exists for this student. Please contact your tutor.');
+}
+
+$clientIp = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+if (ip_rate_limited($clientIp)) {
+    audit_log("REJECTED ip rate limit ip={$clientIp} email={$email}");
+    respond_and_redirect(false, 'Too many registration attempts from this network. Please wait a while and try again, or contact your tutor.');
 }
 
 $lockPath = acquire_request_lock($email);

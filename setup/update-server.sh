@@ -20,7 +20,7 @@ cp "${REPO_ROOT}"/web/lib/*.php /var/www/html/lib/
 chown -R www-data:www-data /var/www/html
 
 cp "${REPO_ROOT}/templates/nginx-students.conf" /etc/nginx/sites-available/students
-install -d -o www-data -g www-data -m 700 /var/lib/5cs045-registrations /var/lib/5cs045-ratelimit /var/lib/5cs045-registration-locks
+install -d -o www-data -g www-data -m 700 /var/lib/5cs045-registrations /var/lib/5cs045-ratelimit /var/lib/5cs045-ip-ratelimit /var/lib/5cs045-registration-locks
 
 # Move old credentials.txt files out of the students' homes (students could edit them)
 install -d -o root -g root -m 700 /var/lib/5cs045-credentials

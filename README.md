@@ -232,6 +232,8 @@ sudo nginx -t
 
 **Registration says "Please wait a few minutes".** The same email tried twice within five minutes. Wait, or delete the file for that email in `/var/lib/5cs045-ratelimit/`.
 
+**Registration says "Too many registration attempts from this network".** More than 40 registration attempts came from the same public IP within 15 minutes - normal if a whole class is behind the same campus NAT and unlucky timing pushed them over, or a sign someone is probing the form. Wait 15 minutes, or clear it early for a specific IP by deleting its file (name is the SHA-256 of the IP address) from `/var/lib/5cs045-ip-ratelimit/`.
+
 ## Safety rules
 
 - The real SMTP password stays only in `/etc/5cs045/smtp_config.php` (owner `root`, group `www-data`, mode `640`). Never commit it or paste it into chat or email.
