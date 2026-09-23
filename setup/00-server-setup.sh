@@ -48,8 +48,8 @@ if [[ ! -f /etc/nginx/ssl/5cs045-selfsigned.crt ]]; then
   openssl req -x509 -nodes -days 825 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/5cs045-selfsigned.key \
     -out /etc/nginx/ssl/5cs045-selfsigned.crt \
-    -subj "/CN=5cs045-student-server" \
-    -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+    -subj "/CN=fullstack.heraldcollege.edu.np" \
+    -addext "subjectAltName=DNS:localhost,DNS:fullstack.heraldcollege.edu.np,DNS:fullstack-student.heraldcollege.edu.np,IP:127.0.0.1"
   chmod 600 /etc/nginx/ssl/5cs045-selfsigned.key
 fi
 
