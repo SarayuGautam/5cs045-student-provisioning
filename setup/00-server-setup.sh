@@ -29,10 +29,9 @@ apt-get install -y -qq \
   git composer acl unzip openssh-server phpmyadmin fail2ban sudo curl
 
 echo "==> Creating student directories"
-mkdir -p /srv/students /srv/students-archive
+mkdir -p /srv/students
 chown root:root /srv/students
 chmod 711 /srv/students
-chmod 700 /srv/students-archive
 
 echo "==> Deploying provisioning tools"
 mkdir -p "${DEPLOY_ROOT}/bin" "${DEPLOY_ROOT}/templates"

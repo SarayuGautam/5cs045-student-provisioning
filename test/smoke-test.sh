@@ -96,8 +96,8 @@ check_code "$BASE_URL/phpmyadmin/" "200" "phpMyAdmin login page loads directly (
 
 echo ""
 echo "=== cleaning up test accounts ==="
-"$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_a --no-backup >/dev/null 2>&1 || true
-"$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_b --no-backup >/dev/null 2>&1 || true
+"$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_a >/dev/null 2>&1 || true
+"$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_b >/dev/null 2>&1 || true
 
 echo ""
 echo "============================================"

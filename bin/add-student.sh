@@ -21,6 +21,13 @@ CRED_DIR="/var/lib/5cs045-credentials"
 LOG_FILE="/var/log/5cs045-provisioning.log"
 POOL_TEMPLATE="$(dirname "$0")/../templates/php-fpm-pool.conf.template"
 USERNAME_RE='^[a-z][a-z0-9_]{2,31}$'
+# Per-student disk cap, in 1K blocks (500 MB). Soft == hard, so a student who
+# hits this gets an immediate "Disk quota exceeded" on their next write rather
+# than a grace period. Requires quota accounting to be enabled on the
+# filesystem that holds $STUDENT_ROOT - see "Disk quotas" in README.md. If
+# quotas are not enabled yet, this step is skipped with a warning instead of
+# blocking account creation.
+QUOTA_KB=512000
 
 USERNAME=""
 FULLNAME=""
@@ -78,6 +85,14 @@ for private in .ssh .sessions; do
   chown "${USERNAME}:${USERNAME}" "${HOME_DIR}/${private}"
   chmod 700 "${HOME_DIR}/${private}"
 done
+
+# Disk quota, so one account cannot fill the whole disk.
+if command -v setquota &>/dev/null && quotaon -p "$STUDENT_ROOT" &>/dev/null; then
+  setquota -u "$USERNAME" "$QUOTA_KB" "$QUOTA_KB" 0 0 "$STUDENT_ROOT" \
+    || log "WARNING: could not set disk quota for ${USERNAME}"
+else
+  log "WARNING: disk quotas are not enabled on ${STUDENT_ROOT}; ${USERNAME} has no per-account cap"
+fi
 
 # Database, named like the username, with the same password.
 # In GRANT an underscore means "any character", so it is escaped to keep the student inside their own database.

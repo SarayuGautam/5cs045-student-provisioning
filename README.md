@@ -122,13 +122,13 @@ The first command makes a new password and prints it. It changes the SSH and dat
 
 ### A student wants to start again
 
-Removing a student saves a backup of their files first, then deletes the account, database and website:
+Removing a student deletes the account, database and website. This is permanent - there is no backup:
 
 ```bash
 sudo ./remove-student.sh -u sarayu_gautam
 ```
 
-Backups are saved in `/srv/students-archive/`. Add `--no-backup` to skip the backup. After removal the student can register again with the same email.
+After removal the student can register again with the same email.
 
 ### See all students
 
@@ -211,6 +211,42 @@ To check the services:
 systemctl status nginx php8.3-fpm mariadb ssh fail2ban --no-pager
 sudo nginx -t
 ```
+
+## Disk quotas
+
+Each student is capped at 500 MB. This is a hard Linux disk quota keyed to the student's own account, applied automatically the moment `add-student.sh` creates them - not something the application enforces, so it holds even over SCP/SFTP, not just the website. Once a student reaches it, further writes fail immediately with "Disk quota exceeded" until they free up space.
+
+This requires quota accounting to be turned on for the filesystem that holds `/srv/students` - it is a one-time, per-server setup step, not something `00-server-setup.sh` does automatically (server disk layouts vary too much to script safely). To enable it:
+
+```bash
+sudo apt-get install -y quota
+# Add usrquota,grpquota to the root filesystem's line in /etc/fstab, then:
+sudo mount -o remount /
+sudo quotacheck -cum /
+sudo quotaon /
+```
+
+To check a student's current usage against their cap, or change it:
+
+```bash
+sudo quota -u sarayu_gautam
+sudo setquota -u sarayu_gautam 512000 512000 0 0 /   # numbers are in 1K blocks; 512000 = 500 MB
+```
+
+If quotas are not enabled yet, `add-student.sh` still creates the account - it just logs a warning that the new student has no cap, instead of failing.
+
+### Growing the disk
+
+If `/srv/students` is on LVM and running low on room, grow it live - no downtime, no reboot:
+
+```bash
+sudo vgs                              # confirm there is free space in the volume group (VFree)
+sudo lvextend -L +100G /dev/ubuntu-vg/ubuntu-lv
+sudo resize2fs /dev/mapper/ubuntu--vg-ubuntu--lv
+df -h /
+```
+
+Adjust the volume group and logical volume names, and the amount to grow by, to match `sudo vgs` / `sudo lvs` on your server.
 
 ## Common problems
 
