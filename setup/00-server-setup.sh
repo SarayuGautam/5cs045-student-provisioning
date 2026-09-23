@@ -79,7 +79,7 @@ visudo -c
 
 echo "==> Deploying public registration form"
 mkdir -p /var/www/html/lib
-cp "${REPO_ROOT}/web/register.php" "${REPO_ROOT}/web/register_handler.php" /var/www/html/
+cp "${REPO_ROOT}/web/index.php" "${REPO_ROOT}/web/register_handler.php" /var/www/html/
 cp "${REPO_ROOT}"/web/lib/*.php /var/www/html/lib/
 chown -R www-data:www-data /var/www/html
 
@@ -114,7 +114,7 @@ echo ""
 echo "============================================================"
 echo " Base setup complete."
 echo ""
-echo " Public registration: https://<server>/register.php"
+echo " Public registration: https://<server>/"
 echo " phpMyAdmin: https://<server>/phpmyadmin/"
 echo " SMTP config: /etc/5cs045/smtp_config.php"
 echo " Admin scripts: /usr/local/sbin/5cs045/bin/"

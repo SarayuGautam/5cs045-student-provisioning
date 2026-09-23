@@ -21,7 +21,7 @@ const RATE_LIMIT_SECONDS = 300;
 
 function respond_and_redirect(bool $ok, string $message): never {
     $_SESSION['register_result'] = ['ok' => $ok, 'message' => $message];
-    header('Location: register.php', true, 303);
+    header('Location: /', true, 303);
     exit;
 }
 

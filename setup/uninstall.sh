@@ -37,7 +37,7 @@ rm -f /etc/fail2ban/jail.d/5cs045-sshd.conf
 rm -rf /etc/5cs045
 rm -rf /var/lib/5cs045-ratelimit /var/lib/5cs045-registration-locks /var/lib/5cs045-registrations
 rm -f /var/log/5cs045-registration.log /var/log/5cs045-provisioning.log
-rm -f /var/www/html/register.php /var/www/html/register_handler.php
+rm -f /var/www/html/index.php /var/www/html/register_handler.php
 rm -rf /var/www/html/lib
 rm -rf "$DEPLOY_ROOT"
 

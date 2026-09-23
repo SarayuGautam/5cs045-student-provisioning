@@ -15,7 +15,7 @@ cp "${REPO_ROOT}/templates/php-fpm-pool.conf.template" "${DEPLOY_ROOT}/templates
 chmod 750 "${DEPLOY_ROOT}"/bin/*
 chown -R root:root "${DEPLOY_ROOT}"
 
-cp "${REPO_ROOT}/web/register.php" "${REPO_ROOT}/web/register_handler.php" /var/www/html/
+cp "${REPO_ROOT}/web/index.php" "${REPO_ROOT}/web/register_handler.php" /var/www/html/
 cp "${REPO_ROOT}"/web/lib/*.php /var/www/html/lib/
 chown -R www-data:www-data /var/www/html
 

@@ -90,7 +90,8 @@ FOLDER_PAGE="$(curl -k -s "$BASE_URL/~smoketest_b/workshops/" 2>/dev/null)"
 
 echo ""
 echo "=== public registration and phpMyAdmin ==="
-check_code "$BASE_URL/register.php" "200" "registration page is public"
+check_code "$BASE_URL/" "200" "registration page is public at the site root"
+check_code "$BASE_URL/register.php" "301" "old /register.php URL redirects to the new site root"
 check_code "$BASE_URL/phpmyadmin/" "200" "phpMyAdmin login page loads directly (no Basic Auth prompt)"
 
 echo ""
