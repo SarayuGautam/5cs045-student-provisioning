@@ -46,7 +46,9 @@ sleep 1
 userdel -r "$USERNAME" 2>&1 | grep -v "mail spool" || true
 
 if [[ -d "$REGISTRY_DIR" ]]; then
-  grep -l "\"username\":\"${USERNAME}\"" "$REGISTRY_DIR"/* 2>/dev/null | xargs -r rm -f
+  # grep finds nothing for accounts made without an email (exit 1). With pipefail that used to
+  # stop the script here, after the account was gone but before the cleanup below.
+  { grep -l "\"username\":\"${USERNAME}\"" "$REGISTRY_DIR"/* 2>/dev/null || true; } | xargs -r rm -f
 fi
 
 rm -f "/var/lib/5cs045-credentials/${USERNAME}" "/var/lib/5cs045-db-over/${USERNAME}"
