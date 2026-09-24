@@ -140,6 +140,20 @@ check_code "$BASE_URL/register.php" "301" "old /register.php URL redirects to th
 check_code "$BASE_URL/phpmyadmin/" "200" "phpMyAdmin login page loads directly (no Basic Auth prompt)"
 
 echo ""
+echo "=== admin panel ==="
+check_code "https://127.0.0.1:8443/login" "200" "admin panel sign-in page loads on port 8443"
+# 127.0.0.2 is the server too, but it is not on the allowed list, so it stands in for a student's computer
+CODE="$(curl -k -s -o /dev/null -w '%{http_code}' --interface 127.0.0.2 https://127.0.0.1:8443/login 2>/dev/null)"
+[[ "$CODE" == "403" ]] && ok "computers not on the allowed list get 403 from the admin panel" \
+  || bad "a computer that is not on the allowed list got HTTP $CODE from the admin panel (expected 403)"
+ANSWER="$(echo '{"action":"students","ip":"127.0.0.1","token":"'"$(printf '0%.0s' {1..64})"'"}' | "$DEPLOY_ROOT/bin/admin-action" 2>/dev/null)"
+[[ "$ANSWER" == *SESSION_EXPIRED* ]] && ok "the panel's server tools refuse requests without a signed-in admin" \
+  || bad "admin-action answered a request without a valid sign-in: ${ANSWER:0:80}"
+su -s /bin/bash www-data -c "sudo -n $DEPLOY_ROOT/bin/admin-action </dev/null" >/dev/null 2>&1 \
+  && bad "www-data (the public website) can run the panel's server tools" \
+  || ok "the public website cannot run the panel's server tools"
+
+echo ""
 echo "=== cleaning up test accounts ==="
 "$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_a >/dev/null 2>&1 || true
 "$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_b >/dev/null 2>&1 || true

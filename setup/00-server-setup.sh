@@ -116,7 +116,11 @@ chmod 600 /var/log/5cs045-provisioning.log
 
 echo "==> Raising the PHP open-file limit (one pool per student)"
 install -D -o root -g root -m 644 "${REPO_ROOT}/templates/php-fpm-systemd.conf" /etc/systemd/system/php8.3-fpm.service.d/5cs045.conf
+install -o root -g root -m 644 "${REPO_ROOT}/templates/php-fpm-global.conf" /etc/php/8.3/fpm/pool.d/00-5cs045-global.conf
 systemctl daemon-reload
+
+echo "==> Deploying the admin panel (port 8443)"
+"${REPO_ROOT}/setup/install-admin-panel.sh"
 
 nginx -t
 systemctl enable --now nginx php8.3-fpm mariadb ssh fail2ban
@@ -130,6 +134,7 @@ echo ""
 echo " Public registration: https://<server>/"
 echo " phpMyAdmin: https://<server>/phpmyadmin/"
 echo " SMTP config: /etc/5cs045/smtp_config.php"
+echo " Admin panel: https://<server>:8443 (sign in with this server's sudo account)"
 echo " Admin scripts: /usr/local/sbin/5cs045/bin/"
 echo ""
 echo " Next: run mysql_secure_installation, put the real SMTP details in"

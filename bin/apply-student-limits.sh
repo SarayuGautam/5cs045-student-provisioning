@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Applies the per-student resource limits:
-#   - a 500 MB disk quota (covers the website, SCP/SFTP uploads and anything else the student writes)
+#   - a 500 MB disk quota, unless the admin panel set a different one (covers the website, SCP/SFTP uploads and anything else the student writes)
 #   - CPU, memory and process limits on everything the student runs over SSH
 #   - membership of the 5cs045-students group, which carries a backup process limit
 #   - no per-user systemd manager, which only costs CPU and memory at login
@@ -16,7 +16,10 @@ set -euo pipefail
 STUDENT_ROOT="/srv/students"
 # Disk quota in 1K blocks (512000 = 500 MB). Soft == hard, so writes fail with
 # "Disk quota exceeded" as soon as it is reached, with no grace period.
+# A different limit for one student (set on the admin panel) is kept in
+# /var/lib/5cs045-quota-overrides/<username>, as a number of 1K blocks.
 QUOTA_KB=512000
+QUOTA_OVERRIDE_DIR="/var/lib/5cs045-quota-overrides"
 # At most one CPU core, 1 GB of memory and 200 processes/threads at a time.
 # 200 is plenty for SSH, composer and git, and stops a fork bomb.
 CPU_QUOTA="100%"
@@ -68,7 +71,10 @@ for user in "${USERS[@]}"; do
   fi
 
   if [[ "$QUOTAS_ON" -eq 1 ]]; then
-    setquota -u "$user" "$QUOTA_KB" "$QUOTA_KB" 0 0 "$QUOTA_MOUNT" || log "WARNING: could not set the disk quota for ${user}"
+    quota_kb="$QUOTA_KB"
+    override="$(cat "${QUOTA_OVERRIDE_DIR}/${user}" 2>/dev/null || true)"
+    [[ "$override" =~ ^[0-9]+$ ]] && quota_kb="$override"
+    setquota -u "$user" "$quota_kb" "$quota_kb" 0 0 "$QUOTA_MOUNT" || log "WARNING: could not set the disk quota for ${user}"
   fi
 
   # SSH logins run inside the user's systemd slice (user-<uid>.slice), so the limits go there.

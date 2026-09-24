@@ -1,0 +1,4 @@
+# /etc/sudoers.d/5cs045-admin
+# The admin panel's PHP (user 5cs045-admin) may run this one program as root, and nothing else.
+# admin-action refuses every request until a sudo account's password has been checked.
+5cs045-admin ALL=(root) NOPASSWD: /usr/local/sbin/5cs045/bin/admin-action

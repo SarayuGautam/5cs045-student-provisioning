@@ -29,6 +29,14 @@ if [[ -d /srv/students ]]; then
 fi
 
 rm -f /etc/nginx/sites-enabled/students /etc/nginx/sites-available/students
+rm -f /etc/nginx/sites-enabled/5cs045-admin /etc/nginx/sites-available/5cs045-admin
+rm -f /etc/php/8.3/fpm/pool.d/5cs045-admin.conf /etc/php/8.3/fpm/pool.d/00-5cs045-global.conf /etc/sudoers.d/5cs045-admin
+rm -rf /var/www/5cs045-admin /var/lib/5cs045-admin /var/lib/5cs045-admin-auth /var/lib/5cs045-admin-jobs /var/lib/5cs045-quota-overrides
+rm -f /var/log/5cs045-admin.log /var/log/nginx/5cs045-admin.access.log
+systemctl reload php8.3-fpm 2>/dev/null || true
+sleep 1
+pkill -u 5cs045-admin 2>/dev/null || true
+userdel 5cs045-admin 2>/dev/null || true
 rm -rf /etc/nginx/ssl/5cs045-selfsigned.*
 rm -f /etc/nginx/.htpasswd-admin /etc/nginx/.htpasswd-register
 rm -f /etc/ssh/sshd_config.d/50-students.conf

@@ -51,7 +51,7 @@ if [[ -d "$REGISTRY_DIR" ]]; then
   { grep -l "\"username\":\"${USERNAME}\"" "$REGISTRY_DIR"/* 2>/dev/null || true; } | xargs -r rm -f
 fi
 
-rm -f "/var/lib/5cs045-credentials/${USERNAME}" "/var/lib/5cs045-db-over/${USERNAME}"
+rm -f "/var/lib/5cs045-credentials/${USERNAME}" "/var/lib/5cs045-db-over/${USERNAME}" "/var/lib/5cs045-quota-overrides/${USERNAME}"
 
 # The SSH limits and user-manager mask written by apply-student-limits.sh (the disk quota goes with the account)
 rm -f "/etc/systemd/system/user-${STUDENT_UID}.slice.d/50-5cs045-limits.conf"

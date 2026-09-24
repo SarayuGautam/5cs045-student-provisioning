@@ -51,6 +51,7 @@ function mark_registered(string $email, string $username, string $status = 'comp
         'username' => $username,
         'registered_at' => date(DATE_ATOM),
         'status' => $status,
+        'email' => strtolower($email),
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     if ($content === false || @file_put_contents($path, $content, LOCK_EX) === false) {
         throw new RuntimeException('Could not record the registration.');

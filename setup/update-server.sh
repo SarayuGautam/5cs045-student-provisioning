@@ -34,6 +34,9 @@ if ! cmp -s "${REPO_ROOT}/templates/php-fpm-systemd.conf" /etc/systemd/system/ph
   FPM_RESTART=1
 fi
 
+# Let running requests finish when PHP reloads (a reload is enough for this one)
+install -o root -g root -m 644 "${REPO_ROOT}/templates/php-fpm-global.conf" /etc/php/8.3/fpm/pool.d/00-5cs045-global.conf
+
 # Room on the system bus for a whole class logging in at once. A reload is enough; never restart dbus.
 if ! cmp -s "${REPO_ROOT}/templates/dbus-5cs045-limits.conf" /etc/dbus-1/system.d/5cs045-limits.conf; then
   install -o root -g root -m 644 "${REPO_ROOT}/templates/dbus-5cs045-limits.conf" /etc/dbus-1/system.d/5cs045-limits.conf
@@ -56,6 +59,8 @@ for old in /srv/students/*/credentials.txt; do
   rm -f "$old"
 done
 
+"${REPO_ROOT}/setup/install-admin-panel.sh"
+
 "${DEPLOY_ROOT}/bin/refresh-student-folders.sh" >/dev/null
 "${DEPLOY_ROOT}/bin/apply-student-limits.sh" >/dev/null
 
@@ -68,4 +73,4 @@ else
 fi
 # SSH and fail2ban read their settings only at (re)start. try-reload leaves a stopped service alone.
 systemctl try-reload-or-restart ssh fail2ban
-echo "Server updated."
+echo "Server updated. Admin panel: https://<server>:8443"

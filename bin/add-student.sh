@@ -3,7 +3,8 @@
 #
 # Usage: sudo add-student.sh -u sarayu_gautam [-n "Full Name"] [-e email] [-d] [-R]
 #
-# -e records the email so the registration page will not create a second account for it.
+# -e records the email, so the registration page will not create a second account for it
+#    and the admin panel can show it.
 # -d reloads PHP 10 seconds later instead of straight away. The registration page uses it,
 #    because reloading PHP would otherwise cut off the page that is running this script.
 # -R does not reload PHP or systemd at all. For creating many accounts in a row: the caller
@@ -51,6 +52,7 @@ case "$USERNAME" in
   mysql|sys|test|root|admin|phpmyadmin|information_schema|performance_schema)
     die "'$USERNAME' is reserved, choose another username" ;;
 esac
+[[ -z "$EMAIL" || "$EMAIL" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || die "that email address does not look right: $EMAIL"
 [[ -f "$POOL_TEMPLATE" ]] || die "missing $POOL_TEMPLATE"
 
 HOME_DIR="${STUDENT_ROOT}/${USERNAME}"
@@ -132,7 +134,7 @@ fi
 if [[ -n "$EMAIL" ]]; then
   install -d -o www-data -g www-data -m 700 "$REGISTRY_DIR"
   KEY="$(printf '%s' "${EMAIL,,}" | sha256sum | cut -d' ' -f1)"
-  printf '{"username":"%s","registered_at":"%s","status":"complete"}' "$USERNAME" "$(date -Is)" > "${REGISTRY_DIR}/${KEY}"
+  printf '{"username":"%s","registered_at":"%s","status":"complete","email":"%s"}' "$USERNAME" "$(date -Is)" "${EMAIL,,}" > "${REGISTRY_DIR}/${KEY}"
   chown www-data:www-data "${REGISTRY_DIR}/${KEY}"
   chmod 600 "${REGISTRY_DIR}/${KEY}"
 fi

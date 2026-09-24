@@ -26,7 +26,7 @@ done
 [[ -z "$PREFIX" || "$PREFIX" =~ ^[a-z][a-z0-9_]*$ ]] || { echo "ERROR: --prefix may only contain lowercase letters, numbers and underscores" >&2; exit 1; }
 
 # Cleans up after accounts that are already gone: the SSH limits, user-manager mask, saved
-# password and database-limit marker that remove-student.sh would normally delete. Earlier
+# password, database-limit marker and disk-limit override that remove-student.sh would normally delete. Earlier
 # versions of remove-student.sh could stop before that step.
 sweep_leftovers() {
   local dropin uid name file swept=0
@@ -42,7 +42,7 @@ sweep_leftovers() {
     fi
     swept=$((swept + 1))
   done
-  for file in /var/lib/5cs045-credentials/* /var/lib/5cs045-db-over/*; do
+  for file in /var/lib/5cs045-credentials/* /var/lib/5cs045-db-over/* /var/lib/5cs045-quota-overrides/*; do
     [[ -f "$file" ]] || continue
     name="$(basename "$file")"
     id "$name" &>/dev/null || { rm -f "$file"; swept=$((swept + 1)); }
