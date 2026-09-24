@@ -17,6 +17,11 @@ if ! id "$PANEL_USER" &>/dev/null; then
 fi
 install -d -o "$PANEL_USER" -g "$PANEL_USER" -m 700 /var/lib/5cs045-admin /var/lib/5cs045-admin/sessions
 
+# Accounts in this group can sign in to the panel without having sudo on the server.
+# Use it for anyone who needs the panel but should not be a full admin (for example VAPT testers):
+#   sudo adduser vapt_panel && sudo usermod -aG 5cs045-panel vapt_panel
+getent group 5cs045-panel >/dev/null || groupadd 5cs045-panel
+
 # State kept by admin-action (root only)
 install -d -o root -g root -m 700 /var/lib/5cs045-admin-auth /var/lib/5cs045-admin-jobs /var/lib/5cs045-quota-overrides
 touch /var/log/5cs045-admin.log

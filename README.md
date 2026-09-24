@@ -73,6 +73,13 @@ That adds the computer you are connected from. You can also:
 
 **How it stays safe:** the panel runs as its own user (`5cs045-admin`), which can do nothing except run one program, `bin/admin-action`. That program checks the sudo password itself, so a bug in the panel's pages cannot change the server without an admin's password.
 
+**Giving someone panel access without sudo.** A sudo account can use the panel, but sudo is full control of the server. For anyone who should use the panel but not have that (for example security testers), put them in the `5cs045-panel` group instead. They can then do everything on the panel, but over SSH they are an ordinary user with no sudo:
+
+```bash
+sudo adduser someone
+sudo usermod -aG 5cs045-panel someone
+```
+
 ## First-time setup
 
 On a fresh Ubuntu 24.04 machine (take a snapshot first if you can):

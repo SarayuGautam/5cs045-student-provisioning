@@ -152,6 +152,21 @@ ANSWER="$(echo '{"action":"students","ip":"127.0.0.1","token":"'"$(printf '0%.0s
 su -s /bin/bash www-data -c "sudo -n $DEPLOY_ROOT/bin/admin-action </dev/null" >/dev/null 2>&1 \
   && bad "www-data (the public website) can run the panel's server tools" \
   || ok "the public website cannot run the panel's server tools"
+# A 5cs045-panel account (for example a VAPT tester) can use the panel but must NOT have sudo.
+if getent group 5cs045-panel >/dev/null; then
+  SMOKE_PANEL_PW="$(openssl rand -base64 12)"
+  useradd -m -s /bin/bash smoketest_panel 2>/dev/null
+  echo "smoketest_panel:${SMOKE_PANEL_PW}" | chpasswd
+  usermod -aG 5cs045-panel smoketest_panel
+  LOGIN="$(echo '{"action":"login","ip":"127.0.0.1","args":{"username":"smoketest_panel","password":"'"${SMOKE_PANEL_PW}"'"}}' | "$DEPLOY_ROOT/bin/admin-action" 2>/dev/null)"
+  [[ "$LOGIN" == *'"token"'* ]] && ok "a 5cs045-panel account can sign in to the panel" \
+    || bad "a 5cs045-panel account could not sign in to the panel: ${LOGIN:0:80}"
+  su -s /bin/bash smoketest_panel -c 'sudo -n true' >/dev/null 2>&1 \
+    && bad "a 5cs045-panel account has sudo (it must not)" \
+    || ok "a 5cs045-panel account has no sudo on the server"
+  userdel -r smoketest_panel >/dev/null 2>&1
+  rm -f /var/lib/5cs045-admin-auth/fails-user-* /var/lib/5cs045-admin-auth/fails-ip-*
+fi
 
 echo ""
 echo "=== cleaning up test accounts ==="

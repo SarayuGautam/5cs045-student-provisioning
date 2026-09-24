@@ -197,7 +197,9 @@ function do_login(array $args, string $ip): never {
         $groups = preg_split('/\s+/', trim($groups));
         [, $shadow] = run(['getent', 'shadow', $user]);
         $hash = explode(':', trim($shadow))[1] ?? '';
-        if (array_intersect(['sudo', 'admin'], $groups) && !in_array('5cs045-students', $groups, true)
+        // sudo/admin accounts are the usual admins; 5cs045-panel is for accounts that should be
+        // able to use the panel but have no sudo on the server (for example VAPT testers).
+        if (array_intersect(['sudo', 'admin', '5cs045-panel'], $groups) && !in_array('5cs045-students', $groups, true)
             && $hash !== '' && !in_array($hash[0], ['!', '*'], true)) {
             // PHP's own crypt() cannot check yescrypt (Ubuntu's default), the system's crypt() can.
             [, $match] = run(['perl', '-e',
