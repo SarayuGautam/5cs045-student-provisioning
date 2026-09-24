@@ -274,6 +274,34 @@ sudo fail2ban-client set recidive delignoreip <test machine IP>
 rm ~/loadtest-accounts.csv
 ```
 
+## Capacity (tested) and hardware
+
+Load-tested on this server (8 CPU cores, about 11 GB of memory free when idle) with 800 test accounts:
+
+| Test | Result |
+|---|---|
+| 800 students logging in over 2 minutes, each keeping a terminal open for a minute | All 800 in. Median login 0.2 s, CPU at most 50%, about 5.5 MB of memory per logged-in student |
+| 800 students uploading 5 MB plus the demo site over 2 minutes (SFTP, what `scp` uses) | All 800 succeeded, 4 GB in total, CPU at most 61% |
+| 800 students pressing Enter in the same second | Only about 300 got a terminal; the login service (systemd-logind) could not set up sessions fast enough and then stayed stuck |
+
+So a whole cohort arriving over a couple of minutes is fine; hundreds in the same second is not. If the login service does get stuck, `check-logind.sh` (every minute, from `/etc/cron.d/5cs045`) restarts it after two minutes and emails `admin_email`. Restarting it does not log anyone out. If logins still fail after that, reboot.
+
+The tests used light commands (`ls`, `php -l`), so they measure logins and uploads, not heavy student work. `composer install`, PHP and MySQL can each use a few hundred MB, so a busy lab needs more memory than the test did.
+
+### Hardware to request from IT
+
+Not urgent - the server copes today - but worth asking for before a full cohort is on it:
+
+1. **32 GB RAM** (check the current total with `free -h`). The main one: headroom for a lab running `composer install` at the same time. Each student is capped at 1 GB.
+2. **Reserved, not shared, CPU and RAM** on the host, so they are there at the busy moments.
+3. **12-16 vCPUs, fast per core.** Helps the rush at the start of a lab. The login service uses one core at a time, so speed per core matters more than the count.
+4. **SSD/NVMe storage.** Composer and MariaDB do lots of small reads and writes.
+5. **At least 1 Gbps** network to the server.
+
+Text that can be sent as it is:
+
+> For the 5CS045 server (10.80.0.250), could we increase it to 32 GB RAM and 12-16 vCPUs, with those resources reserved rather than shared? Please also confirm the disk is on SSD/NVMe storage and the network link is at least 1 Gbps. Load testing showed the current size handles 800 students logging in, but real coursework (composer, PHP, MySQL) needs more memory headroom during busy lab sessions.
+
 ## Resource limits
 
 Every student gets these limits automatically, so one account cannot fill the disk or slow the server down for everyone else:
@@ -379,6 +407,7 @@ bin/apply-student-limits.sh     Disk quota and SSH CPU/memory/process limits
 bin/enforce-limits.sh           Every 15 min: database cap, error log trim, disk alert
 bin/send-admin-alert.php        Email the admin (used by enforce-limits.sh)
 bin/remove-all-students.sh      Remove every student, or every one with a name prefix
+bin/check-logind.sh             Every minute: restart the login service if it stops answering
 setup/00-server-setup.sh        First-time setup
 setup/update-server.sh          Install new files on a working server
 setup/uninstall.sh              Remove everything

@@ -127,6 +127,9 @@ FPM_LIMIT="$(awk '/Max open files/{ print $4 }' "/proc/$(cat /run/php/php8.3-fpm
 [[ "$(systemctl is-enabled "user@${UID_A}.service" 2>/dev/null || true)" == "masked" ]] \
   && ok "new student gets no per-user systemd manager (keeps mass logins fast)" \
   || bad "user@${UID_A}.service is not masked, so every login starts a systemd manager"
+grep -q check-logind.sh /etc/cron.d/5cs045 2>/dev/null && timeout 20 loginctl list-sessions --no-legend >/dev/null 2>&1 \
+  && ok "the login service answers, and its watchdog is scheduled" \
+  || bad "logind is not answering, or check-logind.sh is not in /etc/cron.d/5cs045"
 [[ -f /etc/cron.d/5cs045 ]] && "$DEPLOY_ROOT/bin/enforce-limits.sh" \
   && ok "the limits job is scheduled and runs cleanly" || bad "the limits job is missing or failed"
 
