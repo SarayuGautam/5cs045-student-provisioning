@@ -51,9 +51,12 @@ fi
 
 rm -f "/var/lib/5cs045-credentials/${USERNAME}" "/var/lib/5cs045-db-over/${USERNAME}"
 
-# The SSH limits written by apply-student-limits.sh (the disk quota goes with the account)
+# The SSH limits and user-manager mask written by apply-student-limits.sh (the disk quota goes with the account)
 rm -f "/etc/systemd/system/user-${STUDENT_UID}.slice.d/50-5cs045-limits.conf"
 rmdir "/etc/systemd/system/user-${STUDENT_UID}.slice.d" 2>/dev/null || true
+if [[ "$(readlink "/etc/systemd/system/user@${STUDENT_UID}.service" 2>/dev/null)" == /dev/null ]]; then
+  rm -f "/etc/systemd/system/user@${STUDENT_UID}.service"
+fi
 if [[ "$RELOAD" -eq 1 ]] && [[ -d /run/systemd/system ]]; then
   systemctl daemon-reload
 fi

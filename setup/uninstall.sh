@@ -40,6 +40,11 @@ rm -f /etc/cron.d/5cs045 /etc/cron.allow /etc/at.allow
 rm -f /etc/dbus-1/system.d/5cs045-limits.conf /etc/security/limits.d/5cs045-students.conf
 systemctl reload dbus 2>/dev/null || true
 groupdel 5cs045-students 2>/dev/null || true
+for dropin in /etc/systemd/system/user-*.slice.d/50-5cs045-limits.conf; do
+  [[ -f "$dropin" ]] || continue
+  uid="${dropin#/etc/systemd/system/user-}"; uid="${uid%%.slice.d/*}"
+  [[ "$(readlink "/etc/systemd/system/user@${uid}.service" 2>/dev/null)" == /dev/null ]] && rm -f "/etc/systemd/system/user@${uid}.service"
+done
 rm -f /etc/systemd/system/user-*.slice.d/50-5cs045-limits.conf
 rmdir /etc/systemd/system/user-*.slice.d 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true

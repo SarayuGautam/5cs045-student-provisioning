@@ -290,6 +290,8 @@ Students cannot use `cron` or `at`: those jobs would run outside the limits. Onl
 
 The SSH limits depend on each login getting a systemd session. When a whole class logs in within the same few seconds, the system bus has to handle hundreds of session requests at once, so the setup scripts raise its connection limits (`/etc/dbus-1/system.d/5cs045-limits.conf`). As a safety net, students are also in the `5cs045-students` group, which caps them at 300 processes at every SSH login (`/etc/security/limits.d/5cs045-students.conf`) even if a session could not be created.
 
+Students also get no per-user systemd manager (`user@<uid>.service` is masked). Nothing they do needs one, and in load testing, starting 800 of them at once overloaded the server. The one visible difference is that `systemctl --user` does not work for students.
+
 `add-student.sh` applies the limits to new students, and `update-server.sh` applies them to everyone already registered. To apply them again by hand: `sudo ./apply-student-limits.sh` (all students) or `sudo ./apply-student-limits.sh sarayu_gautam`. The values are at the top of `bin/apply-student-limits.sh` (disk, CPU, memory, processes) and `bin/enforce-limits.sh` (database, error log, disk alert).
 
 `enforce-limits.sh` runs every 15 minutes (`/etc/cron.d/5cs045`) and writes what it did to `/var/log/5cs045-provisioning.log`. It also emails `admin_email` (see "Email settings") when the disk is 80% full, at most once a day.

@@ -3,6 +3,7 @@
 #   - a 500 MB disk quota (covers the website, SCP/SFTP uploads and anything else the student writes)
 #   - CPU, memory and process limits on everything the student runs over SSH
 #   - membership of the 5cs045-students group, which carries a backup process limit
+#   - no per-user systemd manager, which only costs CPU and memory at login
 # PHP for the websites is limited separately, in the student's PHP pool.
 # Safe to run again at any time.
 #
@@ -80,6 +81,12 @@ for user in "${USERS[@]}"; do
 	MemoryMax=${MEMORY_MAX}
 	TasksMax=${TASKS_MAX}
 	EOF
+
+  # No per-user systemd manager (user@<uid>.service). Nothing students do needs one, and
+  # starting hundreds at once is what made mass logins time out in the load test: with 800
+  # logging in, 800 managers pushed the load average past 120 and used ~10 MB each.
+  # logind treats a masked user@ unit as "don't start one"; sessions and limits still work.
+  ln -sfn /dev/null "/etc/systemd/system/user@${uid}.service"
   applied=$((applied + 1))
 done
 

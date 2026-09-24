@@ -124,6 +124,9 @@ FPM_LIMIT="$(awk '/Max open files/{ print $4 }' "/proc/$(cat /run/php/php8.3-fpm
 [[ " $(id -nG smoketest_a) " == *" 5cs045-students "* ]] && [[ -f /etc/security/limits.d/5cs045-students.conf ]] \
   && ok "new student has the backup process limit" \
   || bad "new student is not in 5cs045-students, or /etc/security/limits.d/5cs045-students.conf is missing"
+[[ "$(systemctl is-enabled "user@${UID_A}.service" 2>/dev/null || true)" == "masked" ]] \
+  && ok "new student gets no per-user systemd manager (keeps mass logins fast)" \
+  || bad "user@${UID_A}.service is not masked, so every login starts a systemd manager"
 [[ -f /etc/cron.d/5cs045 ]] && "$DEPLOY_ROOT/bin/enforce-limits.sh" \
   && ok "the limits job is scheduled and runs cleanly" || bad "the limits job is missing or failed"
 
