@@ -106,7 +106,7 @@ Then do these three things.
 | `from_address`, `from_name` | What students see as the sender |
 | `use_starttls` | Keep `true` for port 587 |
 | `allowed_email_domain` | Only emails ending in this can sign up, for example `heraldcollege.edu.np` |
-| `server_url` | The address students use, for example `https://10.80.0.250` |
+| `server_url` | The address of the student websites, used in the login email: `https://fullstack-student.heraldcollege.edu.np` (the student guide uses this address) |
 | `admin_email` | Where server alerts go (disk nearly full, login service restarted). Empty means no alerts. |
 
 This file is never in Git; never put the real password anywhere else. Test it on the panel: **Security → Send a test email**.
