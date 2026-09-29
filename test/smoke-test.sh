@@ -76,6 +76,13 @@ RESULT="$(curl -k -s "$BASE_URL/~smoketest_a/assessment/attack.php" 2>/dev/null)
 [[ "$RESULT" == "BLOCKED" ]] \
   && ok "A's PHP code cannot read B's files" \
   || bad "A's PHP code could read B's files (got: '$RESULT')"
+su - smoketest_a -s /bin/bash -c "cat > /srv/students/smoketest_a/assessment/size.php" <<-'PHP'
+<?php echo strlen(file_get_contents('php://input'));
+PHP
+RESULT="$(head -c 2097152 /dev/zero | curl -k -s --data-binary @- "$BASE_URL/~smoketest_a/assessment/size.php" 2>/dev/null)"
+[[ "$RESULT" == "2097152" ]] \
+  && ok "a 2 MB upload reaches the student's PHP" \
+  || bad "a 2 MB upload did not reach PHP (got: '${RESULT:0:60}'); check client_max_body_size in nginx"
 git -C /srv/students/smoketest_a/assessment init -q 2>/dev/null
 echo "[core]" > /srv/students/smoketest_a/assessment/.git/config 2>/dev/null
 chown -R smoketest_a:smoketest_a /srv/students/smoketest_a/assessment/.git 2>/dev/null
