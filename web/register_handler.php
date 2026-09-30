@@ -138,7 +138,7 @@ if (!hash_equals((string) ($_SESSION['register_csrf'] ?? ''), $csrf)) {
     respond_and_redirect(false, 'The form expired. Please try again.');
 }
 
-$email = trim((string) ($_POST['email'] ?? ''));
+$email = strtolower(trim((string) ($_POST['email'] ?? '')));
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     respond_and_redirect(false, 'Please enter a valid college email.');
 }
@@ -150,6 +150,12 @@ if ($allowedDomain !== '') {
         audit_log("REJECTED wrong domain: {$email}");
         respond_and_redirect(false, "Please use your @{$allowedDomain} college email.");
     }
+}
+
+// name+1@ reaches the same inbox as name@, so it would give one student a second account
+if (!is_plain_address($email)) {
+    audit_log("REJECTED not a plain address: {$email}");
+    respond_and_redirect(false, 'Please type your college email exactly as it is, with nothing added to it (no + part).');
 }
 
 $username = derive_username($email);

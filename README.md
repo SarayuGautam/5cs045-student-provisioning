@@ -156,6 +156,8 @@ This installs the new scripts, pages and admin panel. It does not touch email se
 
 **Sign-up says "Please wait a few minutes" or "Too many registration attempts from this network".** It allows one try per email every 5 minutes and 40 per network every 15 minutes. Wait, or delete the matching file in `/var/lib/5cs045-ratelimit/` or `/var/lib/5cs045-ip-ratelimit/`.
 
+**A student has extra accounts made with `name+1@`.** College mail delivers `name+anything@` to `name@`, so sign-up used to let one student register again and again. It now accepts only plain addresses. To find accounts made before that, type `+` in the search box on **Students**, and remove the extras.
+
 **A student's site shows 403.** Usually the folder has no index.php or index.html. Files uploaded over SSH, SCP or SFTP are made readable by the web server automatically when the session ends (Windows' scp uploads files only the student can read). If a folder still shows 403, run `sudo /usr/local/sbin/5cs045/bin/refresh-student-folders.sh <username>`.
 
 **A student's site shows 404.** The files must be inside `workshops`, `exam` or `assessment`.

@@ -16,6 +16,16 @@ function derive_username(string $email): ?string {
     return preg_match('/^[a-z][a-z0-9_]{2,31}$/', $local) ? $local : null;
 }
 
+// True only for a plain mailbox name: letters and digits, with single dots, hyphens or underscores
+// between them. College mail delivers name+anything@ to name@, so without this one student could
+// sign up again and again as name+1@, name+2@ ..., with every new login emailed to the same inbox.
+// It also rules out quoted names and other unusual forms that a mail server may deliver the same way.
+function is_plain_address(string $email): bool {
+    $at = strrpos($email, '@');
+    if ($at === false) return false;
+    return preg_match('/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/', strtolower(substr($email, 0, $at))) === 1;
+}
+
 // The file name used to remember that an email has been registered.
 function registration_key(string $email): string {
     return hash('sha256', strtolower($email));

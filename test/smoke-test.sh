@@ -179,6 +179,18 @@ echo "=== public registration and phpMyAdmin ==="
 check_code "$BASE_URL/" "200" "registration page is public at the site root"
 check_code "$BASE_URL/register.php" "301" "old /register.php URL redirects to the new site root"
 check_code "$BASE_URL/phpmyadmin/" "200" "phpMyAdmin login page loads directly (no Basic Auth prompt)"
+# name+1@ reaches the same inbox as name@, so sign-up must refuse it, or one student could make as
+# many accounts as they like. The address is refused before anything is created or emailed.
+DOMAIN="$(php -r '$c = @include "/etc/5cs045/smtp_config.php"; echo (string) ($c["allowed_email_domain"] ?? "");' 2>/dev/null)"
+JAR="$(mktemp)"
+TOKEN="$("${CURL[@]}" -c "$JAR" -b "$JAR" "$BASE_URL/" 2>/dev/null | sed -n 's/.*name="csrf_token" value="\([0-9a-f]*\)".*/\1/p' | head -1)"
+"${CURL[@]}" -c "$JAR" -b "$JAR" -o /dev/null --data-urlencode "csrf_token=${TOKEN}" \
+  --data-urlencode "email=smoketest.plus+1@${DOMAIN:-heraldcollege.edu.np}" "$BASE_URL/register_handler.php" 2>/dev/null
+PAGE="$("${CURL[@]}" -c "$JAR" -b "$JAR" "$BASE_URL/" 2>/dev/null)"
+rm -f "$JAR"
+[[ "$PAGE" == *"with nothing added to it"* ]] \
+  && ok "sign-up refuses name+1@ addresses, which reach the same inbox as name@" \
+  || bad "sign-up accepted a name+1@ address, so one student can register again and again"
 
 echo ""
 echo "=== student websites kept apart from everything else ==="
@@ -224,6 +236,8 @@ echo ""
 echo "=== cleaning up test accounts ==="
 "$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_a >/dev/null 2>&1 || true
 "$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_b >/dev/null 2>&1 || true
+# Only exists if the name+1@ sign-up check above failed and made an account
+id smoketest_plus_1 >/dev/null 2>&1 && { "$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_plus_1 >/dev/null 2>&1 || true; }
 
 echo ""
 echo "============================================"
