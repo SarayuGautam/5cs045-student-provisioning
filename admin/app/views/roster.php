@@ -30,7 +30,7 @@ $online = count(array_filter($students, fn($x) => $x['online']));
   <?php if (!$students): ?>
     <div class="empty">
       <p><strong>No students yet.</strong></p>
-      <p>They appear here as soon as they register at <?= h($settings['server_url'] ?: 'the registration page') ?>. You can also add one yourself<?= $selected ? '' : ' on the right' ?>.</p>
+      <p>They appear here as soon as they register on the sign-up page. You can also add one yourself<?= $selected ? '' : ' on the right' ?>.</p>
     </div>
   <?php else: ?>
     <ol class="people" data-people>

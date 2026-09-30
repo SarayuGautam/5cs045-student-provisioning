@@ -9,7 +9,11 @@ bad()  { echo "  FAIL: $1"; FAIL=$((FAIL+1)); }
 [[ $EUID -eq 0 ]] || { echo "run as root"; exit 1; }
 
 BASE_URL="https://localhost"
-CURL=(curl -k -s)
+# Students' websites are only on their own name (templates/nginx-students.conf). Checks of
+# student pages ask for that name, sent straight to this server.
+STUDENT_HOST="fullstack-student.heraldcollege.edu.np"
+STUDENT_URL="https://${STUDENT_HOST}"
+CURL=(curl -k -s --noproxy '*' --resolve "${STUDENT_HOST}:443:127.0.0.1" --resolve "${STUDENT_HOST}:8443:127.0.0.1")
 # SSH on this server is not on port 22; log in on the first port sshd answers on
 SSH_PORT=22
 for p in $("${DEPLOY_ROOT}/bin/ssh-ports.sh" 2>/dev/null | tr ',' ' '); do
@@ -19,7 +23,7 @@ done
 check_code() {
   local url="$1" expected="$2" label="$3"
   local code
-  code="$(curl -k -s -o /dev/null -w '%{http_code}' "$url" 2>/dev/null)"
+  code="$("${CURL[@]}" -o /dev/null -w '%{http_code}' "$url" 2>/dev/null)"
   [[ "$code" == "$expected" ]] && ok "$label" || bad "$label (got HTTP $code)"
 }
 
@@ -76,7 +80,7 @@ if command -v sshpass >/dev/null; then
   "${SSH_A[@]}" 'mkdir -m 700 ~/workshops/winupload && printf ok > ~/workshops/winupload/index.html && chmod 600 ~/workshops/winupload/index.html' >/dev/null 2>&1
   CODE=""
   for _ in $(seq 1 30); do
-    CODE="$(curl -k -s -o /dev/null -w '%{http_code}' "$BASE_URL/~smoketest_a/workshops/winupload/" 2>/dev/null)"
+    CODE="$("${CURL[@]}" -o /dev/null -w '%{http_code}' "$STUDENT_URL/~smoketest_a/workshops/winupload/" 2>/dev/null)"
     [[ "$CODE" == "200" ]] && break
     sleep 0.5
   done
@@ -92,34 +96,34 @@ fi
 echo ""
 echo "=== PHP-FPM process isolation ==="
 su - smoketest_a -s /bin/bash -c 'echo "<?php echo posix_getpwuid(posix_geteuid())[\"name\"]; ?>" > /srv/students/smoketest_a/assessment/whoami.php'
-RESULT="$(curl -k -s "$BASE_URL/~smoketest_a/assessment/whoami.php" 2>/dev/null)"
+RESULT="$("${CURL[@]}" "$STUDENT_URL/~smoketest_a/assessment/whoami.php" 2>/dev/null)"
 [[ "$RESULT" == "smoketest_a" ]] \
   && ok "PHP for A executes as smoketest_a" \
   || bad "PHP did not execute as smoketest_a (got: '$RESULT')"
 su - smoketest_a -s /bin/bash -c "cat > /srv/students/smoketest_a/assessment/attack.php" <<-'PHP'
 <?php echo @file_get_contents('/srv/students/smoketest_b/assessment/index.php') === false ? 'BLOCKED' : 'LEAKED';
 PHP
-RESULT="$(curl -k -s "$BASE_URL/~smoketest_a/assessment/attack.php" 2>/dev/null)"
+RESULT="$("${CURL[@]}" "$STUDENT_URL/~smoketest_a/assessment/attack.php" 2>/dev/null)"
 [[ "$RESULT" == "BLOCKED" ]] \
   && ok "A's PHP code cannot read B's files" \
   || bad "A's PHP code could read B's files (got: '$RESULT')"
 su - smoketest_a -s /bin/bash -c "cat > /srv/students/smoketest_a/assessment/size.php" <<-'PHP'
 <?php echo strlen(file_get_contents('php://input'));
 PHP
-RESULT="$(head -c 2097152 /dev/zero | curl -k -s --data-binary @- "$BASE_URL/~smoketest_a/assessment/size.php" 2>/dev/null)"
+RESULT="$(head -c 2097152 /dev/zero | "${CURL[@]}" --data-binary @- "$STUDENT_URL/~smoketest_a/assessment/size.php" 2>/dev/null)"
 [[ "$RESULT" == "2097152" ]] \
   && ok "a 2 MB upload reaches the student's PHP" \
   || bad "a 2 MB upload did not reach PHP (got: '${RESULT:0:60}'); check client_max_body_size in nginx"
 git -C /srv/students/smoketest_a/assessment init -q 2>/dev/null
 echo "[core]" > /srv/students/smoketest_a/assessment/.git/config 2>/dev/null
 chown -R smoketest_a:smoketest_a /srv/students/smoketest_a/assessment/.git 2>/dev/null
-check_code "$BASE_URL/~smoketest_a/assessment/.git/config" "404" ".git metadata is not servable over HTTPS"
+check_code "$STUDENT_URL/~smoketest_a/assessment/.git/config" "404" ".git metadata is not servable over HTTPS"
 check_code "$BASE_URL/smtp_config.php" "404" "smtp_config.php is not servable over HTTPS"
 
 
-ROOT_PAGE="$(curl -k -s "$BASE_URL/~smoketest_a/" 2>/dev/null)"
+ROOT_PAGE="$("${CURL[@]}" "$STUDENT_URL/~smoketest_a/" 2>/dev/null)"
 [[ "$ROOT_PAGE" == *"Welcome, smoketest_a"* ]] && ok "student root URL shows the welcome page" || bad "student root URL did not show the welcome page"
-FOLDER_PAGE="$(curl -k -s "$BASE_URL/~smoketest_b/workshops/" 2>/dev/null)"
+FOLDER_PAGE="$("${CURL[@]}" "$STUDENT_URL/~smoketest_b/workshops/" 2>/dev/null)"
 [[ "$FOLDER_PAGE" == *"weekly workshop work"* ]] && ok "an empty folder shows its short description" || bad "an empty folder did not show its description"
 
 echo ""
@@ -175,6 +179,17 @@ echo "=== public registration and phpMyAdmin ==="
 check_code "$BASE_URL/" "200" "registration page is public at the site root"
 check_code "$BASE_URL/register.php" "301" "old /register.php URL redirects to the new site root"
 check_code "$BASE_URL/phpmyadmin/" "200" "phpMyAdmin login page loads directly (no Basic Auth prompt)"
+
+echo ""
+echo "=== student websites kept apart from everything else ==="
+check_code "$STUDENT_URL/" "404" "${STUDENT_HOST} does not show the sign-up page"
+check_code "$STUDENT_URL/phpmyadmin/" "404" "${STUDENT_HOST} does not serve phpMyAdmin"
+[[ "$("${CURL[@]}" -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE_URL/~smoketest_a/" 2>/dev/null)" == "301 ${STUDENT_URL}/~smoketest_a/" ]] \
+  && ok "student pages asked for on the main name are sent to ${STUDENT_HOST}" \
+  || bad "student pages are served on the main name (they must only be on ${STUDENT_HOST})"
+"${CURL[@]}" -o /dev/null "${STUDENT_URL}:8443/login" 2>/dev/null \
+  && bad "the admin panel answers on ${STUDENT_HOST}:8443" \
+  || ok "the admin panel does not answer on ${STUDENT_HOST}"
 
 echo ""
 echo "=== admin panel ==="

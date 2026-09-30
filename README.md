@@ -17,15 +17,17 @@ A server for the Full Stack Development module. Every student gets their own log
 
 - **A login.** One password for SSH, SCP and phpMyAdmin/MySQL.
 - **A database** with the same name as their username.
-- **Three websites:**
-  - `https://<server>/~<username>/workshops/` for weekly work, one folder per week.
-  - `https://<server>/~<username>/assessment/` for the assessment project.
-  - `https://<server>/~<username>/exam/` for the exam.
+- **Three websites** on `https://fullstack-student.heraldcollege.edu.np`:
+  - `/~<username>/workshops/` for weekly work, one folder per week.
+  - `/~<username>/assessment/` for the assessment project.
+  - `/~<username>/exam/` for the exam.
 - **Limits:** 500 MB of disk space and a 100 MB database (see "Limits").
 
 Students cannot see each other's files. Their username comes from their email: `sarayu.gautam@heraldcollege.edu.np` becomes `sarayu_gautam`.
 
-**How they sign up:** they open `https://<server>/`, type their college email, and get their login by email. Each email can sign up once, and the websites work about 10 seconds later. Students cannot reset their own password; you do that on the panel.
+**How they sign up:** they open `https://fullstack.heraldcollege.edu.np/`, type their college email, and get their login by email. Each email can sign up once, and the websites work about 10 seconds later. Students cannot reset their own password; you do that on the panel.
+
+**Two names, kept apart.** `fullstack-student.heraldcollege.edu.np` serves students' websites and nothing else. `fullstack.heraldcollege.edu.np` (and the bare IP) serves sign-up, phpMyAdmin and, on port 8443, the admin panel; student pages asked for there are sent to the student name. Students' pages run their own scripts, so they never share an address with anything that holds a login.
 
 ## The admin panel
 
@@ -53,7 +55,7 @@ Long jobs (adding a class, the health check, removing everyone) run in the backg
 
 Students never see it. Three things keep them out:
 
-1. **Its own port.** The panel is on port 8443, and the student site does not link to it.
+1. **Its own port.** The panel is on port 8443, the student site does not link to it, and it does not answer on the students' name.
 2. **The allowed list.** Only computers on the list can open it; everyone else gets "403 Forbidden". The first install allows the computer you ran it from. Change the list on the **Security** page.
 3. **A sudo password.** After 5 wrong passwords, that account and that computer have to wait 15 minutes.
 
@@ -201,7 +203,7 @@ nano config.php              # your username, password, and username again as th
 mysql -u sarayu_gautam -p sarayu_gautam < schema.sql
 ```
 
-**3. Open it:** `https://<server>/~sarayu_gautam/assessment/`. Anything uploaded is live straight away, with no `chmod` needed. To change the site, edit it on the laptop and run the `scp` command again.
+**3. Open it:** `https://fullstack-student.heraldcollege.edu.np/~sarayu_gautam/assessment/`. Anything uploaded is live straight away, with no `chmod` needed. To change the site, edit it on the laptop and run the `scp` command again.
 
 ## Capacity and hardware
 
