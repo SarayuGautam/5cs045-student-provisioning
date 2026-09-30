@@ -10,6 +10,11 @@ bad()  { echo "  FAIL: $1"; FAIL=$((FAIL+1)); }
 
 BASE_URL="https://localhost"
 CURL=(curl -k -s)
+# SSH on this server is not on port 22; log in on the first port sshd answers on
+SSH_PORT=22
+for p in $("${DEPLOY_ROOT}/bin/ssh-ports.sh" 2>/dev/null | tr ',' ' '); do
+  if timeout 2 bash -c "exec 3<>/dev/tcp/127.0.0.1/${p}" 2>/dev/null; then SSH_PORT="$p"; break; fi
+done
 
 check_code() {
   local url="$1" expected="$2" label="$3"
@@ -29,7 +34,7 @@ FPM_PID_FILE="/run/php/php8.3-fpm.pid"
 echo ""
 echo "=== password login checks ==="
 if command -v sshpass >/dev/null; then
-  timeout 8 sshpass -p "$PW_A" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=4 smoketest_a@localhost 'echo ok' 2>/dev/null | grep -q ok \
+  timeout 8 sshpass -p "$PW_A" ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=4 smoketest_a@localhost 'echo ok' 2>/dev/null | grep -q ok \
     && ok "generated password logs in over SSH" \
     || bad "generated password did NOT log in over SSH"
 else
@@ -67,7 +72,7 @@ su -s /bin/bash www-data -c 'echo tampered > /srv/students/smoketest_a/assessmen
   && ok "student SSH sessions go through student-ssh-session.sh" \
   || bad "student SSH sessions do not go through student-ssh-session.sh (see /etc/ssh/sshd_config.d/50-students.conf)"
 if command -v sshpass >/dev/null; then
-  SSH_A=(timeout 20 sshpass -p "$PW_A" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=4 smoketest_a@localhost)
+  SSH_A=(timeout 20 sshpass -p "$PW_A" ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=4 smoketest_a@localhost)
   "${SSH_A[@]}" 'mkdir -m 700 ~/workshops/winupload && printf ok > ~/workshops/winupload/index.html && chmod 600 ~/workshops/winupload/index.html' >/dev/null 2>&1
   CODE=""
   for _ in $(seq 1 30); do
@@ -147,6 +152,9 @@ FPM_LIMIT="$(awk '/Max open files/{ print $4 }' "/proc/$(cat /run/php/php8.3-fpm
 [[ "$(sshd -T 2>/dev/null | awk '$1 == "maxstartups" { print $2 }')" == "1000:30:1500" ]] \
   && ok "sshd accepts a whole lab logging in at once" \
   || bad "sshd MaxStartups is not 1000:30:1500, so mass logins get dropped"
+grep -Eq "^port = ([0-9]+,)*${SSH_PORT}(,[0-9]+)*$" /etc/fail2ban/jail.d/5cs045-sshd.conf 2>/dev/null \
+  && ok "fail2ban blocks password guessing on SSH port ${SSH_PORT}" \
+  || bad "fail2ban does not guard SSH port ${SSH_PORT} (run setup/update-server.sh)"
 [[ -f /etc/dbus-1/system.d/5cs045-limits.conf ]] \
   && ok "the system bus has room for a whole class logging in at once" \
   || bad "/etc/dbus-1/system.d/5cs045-limits.conf is missing, so mass logins lose their limits"

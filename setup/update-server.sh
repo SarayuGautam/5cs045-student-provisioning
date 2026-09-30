@@ -35,6 +35,10 @@ command -v sshpass >/dev/null || apt-get install -y -qq sshpass >/dev/null 2>&1 
   || echo "    Could not install sshpass, so the health check will skip its SSH checks."
 sshd -t
 cp "${REPO_ROOT}/templates/fail2ban-5cs045.conf" /etc/fail2ban/jail.d/5cs045-sshd.conf
+# Point the lockout at the port students really use (not 22 here), or guessing is never blocked
+SSH_PORTS="$("${REPO_ROOT}/bin/ssh-ports.sh")"
+sed -i "s/^port = ssh$/port = ${SSH_PORTS:-ssh}/" /etc/fail2ban/jail.d/5cs045-sshd.conf
+echo "    fail2ban guards SSH port ${SSH_PORTS:-22}"
 
 # PHP's open-file limit only changes on a restart, so restart only when the setting changed
 FPM_RESTART=0
