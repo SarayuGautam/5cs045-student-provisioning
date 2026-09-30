@@ -191,6 +191,29 @@ rm -f "$JAR"
 [[ "$PAGE" == *"with nothing added to it"* ]] \
   && ok "sign-up refuses name+1@ addresses, which reach the same inbox as name@" \
   || bad "sign-up accepted a name+1@ address, so one student can register again and again"
+# Sign-up only emails a link, and the account is made when the student clicks Create my account on
+# the page it opens. These checks save a link for a made-up address themselves, so nothing is emailed.
+check_code "$BASE_URL/confirm_handler.php" "303" "the create-account step is on the sign-up site"
+LINK_DIR="/var/lib/5cs045-signup-links"
+[[ "$(stat -c %U:%a "$LINK_DIR" 2>/dev/null)" == "www-data:700" ]] \
+  && ok "sign-up links are stored where only the web server can read them" \
+  || bad "${LINK_DIR} is missing or readable by others (run setup/update-server.sh)"
+LINK_TOKEN="$(openssl rand -hex 32)"
+LINK_FILE="${LINK_DIR}/$(printf '%s' "$LINK_TOKEN" | sha256sum | cut -d' ' -f1)"
+save_link() { printf '{"email":"smoketest.link@%s","username":"smoketest_link","expires":%d}' "${DOMAIN:-heraldcollege.edu.np}" "$(( $(date +%s) + $1 ))" > "$LINK_FILE"; chown www-data:www-data "$LINK_FILE"; chmod 600 "$LINK_FILE"; }
+save_link 600
+PAGE="$("${CURL[@]}" "$BASE_URL/?confirm=${LINK_TOKEN}" 2>/dev/null)"
+[[ "$PAGE" == *"Create my account"* && "$PAGE" == *smoketest_link* ]] && ! id smoketest_link >/dev/null 2>&1 \
+  && ok "opening a sign-up link asks first and creates nothing by itself" \
+  || bad "a sign-up link did not show the Create my account button, or made the account just by being opened"
+save_link -60
+PAGE="$("${CURL[@]}" "$BASE_URL/?confirm=${LINK_TOKEN}" 2>/dev/null)"
+[[ "$PAGE" == *"This link has expired"* && "$PAGE" != *"Create my account"* ]] \
+  && ok "an expired sign-up link is refused" || bad "an expired sign-up link still offers to create the account"
+rm -f "$LINK_FILE"
+PAGE="$("${CURL[@]}" "$BASE_URL/?confirm=$(openssl rand -hex 32)" 2>/dev/null)"
+[[ "$PAGE" == *"This link is not valid"* ]] \
+  && ok "a made-up sign-up link is refused" || bad "a made-up sign-up link was not refused"
 
 echo ""
 echo "=== student websites kept apart from everything else ==="
@@ -236,8 +259,10 @@ echo ""
 echo "=== cleaning up test accounts ==="
 "$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_a >/dev/null 2>&1 || true
 "$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_b >/dev/null 2>&1 || true
-# Only exists if the name+1@ sign-up check above failed and made an account
-id smoketest_plus_1 >/dev/null 2>&1 && { "$DEPLOY_ROOT/bin/remove-student.sh" -u smoketest_plus_1 >/dev/null 2>&1 || true; }
+# Only exist if the sign-up checks above failed and made an account
+for leftover in smoketest_plus_1 smoketest_link; do
+  id "$leftover" >/dev/null 2>&1 && { "$DEPLOY_ROOT/bin/remove-student.sh" -u "$leftover" >/dev/null 2>&1 || true; }
+done
 
 echo ""
 echo "============================================"

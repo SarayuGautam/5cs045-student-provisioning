@@ -25,7 +25,7 @@ A server for the Full Stack Development module. Every student gets their own log
 
 Students cannot see each other's files. Their username comes from their email: `sarayu.gautam@heraldcollege.edu.np` becomes `sarayu_gautam`.
 
-**How they sign up:** they open `https://fullstack.heraldcollege.edu.np/`, type their college email, and get their login by email. Each email can sign up once, and the websites work about 10 seconds later. Students cannot reset their own password; you do that on the panel.
+**How they sign up:** they open `https://fullstack.heraldcollege.edu.np/` and type their college email. It is sent a link; they open it and click **Create my account**, and their login arrives in a second email. Nothing is created until the link is used, so a mistyped or made-up address never gets an account. Each email can sign up once, and the websites work about 10 seconds later. Students cannot reset their own password; you do that on the panel.
 
 **Two names, kept apart.** `fullstack-student.heraldcollege.edu.np` serves students' websites and nothing else. `fullstack.heraldcollege.edu.np` (and the bare IP) serves sign-up, phpMyAdmin and, on port 8443, the admin panel; student pages asked for there are sent to the student name. Students' pages run their own scripts, so they never share an address with anything that holds a login.
 
@@ -109,6 +109,7 @@ Then do these three things.
 | `use_starttls` | Keep `true` for port 587 |
 | `allowed_email_domain` | Only emails ending in this can sign up, for example `heraldcollege.edu.np` |
 | `server_url` | The address of the student websites, used in the login email: `https://fullstack-student.heraldcollege.edu.np` (the student guide uses this address) |
+| `signup_url` | The sign-up page's address, used in the link students click to create their account. Leave it out to use `https://fullstack.heraldcollege.edu.np` |
 | `admin_email` | Where server alerts go (disk nearly full, login service restarted). Empty means no alerts. |
 
 This file is never in Git; never put the real password anywhere else. Test it on the panel: **Security → Send a test email**.
@@ -152,9 +153,15 @@ This installs the new scripts, pages and admin panel. It does not touch email se
 
 **"INSERT command denied".** Their database is over 100 MB, so it has become read-only. Dropping unused tables frees space straight away. After deleting many rows, run `sudo mysqlcheck --optimize <username>`. Full access comes back within 15 minutes.
 
-**Sign-up says "could not send the email".** The account was made, but the email failed. Fix the email settings, then click **Email their login** for that student.
+**Sign-up says "We could not send an email".** Nothing was made. If the address is right, the email settings are wrong: check them with **Security → Send a test email**. The student can try again straight away.
 
-**Sign-up says "Please wait a few minutes" or "Too many registration attempts from this network".** It allows one try per email every 5 minutes and 40 per network every 15 minutes. Wait, or delete the matching file in `/var/lib/5cs045-ratelimit/` or `/var/lib/5cs045-ip-ratelimit/`.
+**A student never got the link.** It may be in Spam. They can ask for a new one on the sign-up page after 5 minutes, and each link works for 1 hour. If their mail never arrives, add them yourself on **Students**.
+
+**"Your account is ready, but the email with your password did not send".** The account exists. Click **Email their login** for that student once email works again.
+
+**Sign-up says "A link was sent to this email in the last 5 minutes" or "Too many registration attempts from this network".** It allows one link per email every 5 minutes and 40 per network every 15 minutes. Wait, or delete the matching file in `/var/lib/5cs045-ratelimit/` or `/var/lib/5cs045-ip-ratelimit/`.
+
+**Accounts made for addresses that do not exist.** Sign-up used to create the account before sending the email, so a typo or a made-up address still got one. Now nothing is made until the emailed link is used. To find the old ones, look in the sending mailbox for "Address not found" bounces (and on **Logs → Registrations** for "EMAIL SEND FAILED"), and remove those students on **Students**.
 
 **A student has extra accounts made with `name+1@`.** College mail delivers `name+anything@` to `name@`, so sign-up used to let one student register again and again. It now accepts only plain addresses. To find accounts made before that, type `+` in the search box on **Students**, and remove the extras.
 

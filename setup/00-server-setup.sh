@@ -91,7 +91,7 @@ visudo -c
 
 echo "==> Deploying public registration form"
 mkdir -p /var/www/html/lib
-cp "${REPO_ROOT}/web/index.php" "${REPO_ROOT}/web/register_handler.php" /var/www/html/
+cp "${REPO_ROOT}/web/index.php" "${REPO_ROOT}/web/register_handler.php" "${REPO_ROOT}/web/confirm_handler.php" /var/www/html/
 cp "${REPO_ROOT}"/web/lib/*.php /var/www/html/lib/
 chown -R www-data:www-data /var/www/html
 
@@ -111,6 +111,7 @@ install -d -o www-data -g www-data -m 700 /var/lib/5cs045-ratelimit
 install -d -o www-data -g www-data -m 700 /var/lib/5cs045-ip-ratelimit
 install -d -o www-data -g www-data -m 700 /var/lib/5cs045-registration-locks
 install -d -o www-data -g www-data -m 700 /var/lib/5cs045-registrations
+install -d -o www-data -g www-data -m 700 /var/lib/5cs045-signup-links
 
 echo "==> Creating logs"
 touch /var/log/5cs045-registration.log /var/log/5cs045-provisioning.log

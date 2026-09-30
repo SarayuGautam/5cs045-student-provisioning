@@ -14,6 +14,24 @@ if (empty($_SESSION['register_csrf'])) {
 
 $message = $_SESSION['register_result'] ?? null;
 unset($_SESSION['register_result']);
+
+// Opened from the link in the sign-up email. Nothing happens until the student clicks
+// "Create my account" (confirm_handler.php), because mail scanners open links too.
+require __DIR__ . '/lib/credentials.php';
+require __DIR__ . '/lib/registration.php';
+$token = is_string($_GET['confirm'] ?? null) ? $_GET['confirm'] : '';
+$confirm = null;
+if ($token !== '') {
+    $confirm = find_signup_link($token, $expired);
+    if ($confirm === null) {
+        $message = ['ok' => false, 'message' => $expired ? SIGNUP_LINK_EXPIRED : SIGNUP_LINK_NOT_VALID];
+    } elseif (already_registered($confirm['email'])) {
+        delete_signup_link($token);
+        $message = ['ok' => true, 'message' => "Your account has already been created. Your username and password were emailed to {$confirm['email']}."];
+        $confirm = null;
+    }
+}
+$e = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -119,6 +137,12 @@ h1 {
     color: var(--muted);
     font-size: 15px;
     line-height: 1.8;
+}
+
+.intro strong {
+    color: var(--ink);
+    font-weight: 600;
+    overflow-wrap: anywhere;
 }
 
 .message {
@@ -301,17 +325,30 @@ button.loading .spinner {
         </div>
 
         <div class="content">
+            <?php if ($confirm !== null): ?>
+            <h1>Create your server account</h1>
+            <p class="intro">Your username will be <strong><?= $e($confirm['username']) ?></strong>. Click the button to create your account, and your password will be emailed to <strong><?= $e($confirm['email']) ?></strong>.</p>
+
+            <form method="post" action="confirm_handler.php">
+                <input type="hidden" name="csrf_token" value="<?= $e($_SESSION['register_csrf']) ?>">
+                <input type="hidden" name="token" value="<?= $e($token) ?>">
+                <button type="submit" id="submitBtn">
+                    <span class="btn-label">Create my account</span>
+                    <span class="spinner" aria-hidden="true"></span>
+                </button>
+            </form>
+            <?php else: ?>
             <h1>Register for your server account</h1>
-            <p class="intro">Enter your college email address. Your credentials will be sent to your mail.</p>
+            <p class="intro">Enter your college email address. We will email you a link to create your account.</p>
 
             <?php if ($message !== null): ?>
                 <div class="message <?= $message['ok'] ? 'ok' : 'err' ?>">
-                    <?= htmlspecialchars($message['message'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+                    <?= $e($message['message']) ?>
                 </div>
             <?php endif; ?>
 
             <form method="post" action="register_handler.php" autocomplete="on">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['register_csrf'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+                <input type="hidden" name="csrf_token" value="<?= $e($_SESSION['register_csrf']) ?>">
                 <input
                     id="email"
                     name="email"
@@ -328,6 +365,7 @@ button.loading .spinner {
                     <span class="spinner" aria-hidden="true"></span>
                 </button>
             </form>
+            <?php endif; ?>
         </div>
     </main>
 </div>

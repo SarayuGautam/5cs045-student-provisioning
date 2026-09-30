@@ -31,6 +31,24 @@ function registration_key(string $email): string {
     return hash('sha256', strtolower($email));
 }
 
+// The first email: a one-time link that proves the student can read this mailbox (see registration.php)
+function signup_link_email_body(string $username, string $link): string {
+    return <<<TXT
+Confirm your server account
+
+Full Stack Development Module Server
+
+To create your server account, open this link within 1 hour and click Create my account:
+
+{$link}
+
+Your username will be: {$username}
+Your password will follow in a second email.
+
+If you did not ask for a server account, ignore this email. Nothing is created unless the link is used.
+TXT;
+}
+
 function credentials_email_body(string $username, string $password, string $serverUrl): string {
     $site = rtrim($serverUrl, '/') . '/~' . $username;
     return <<<TXT

@@ -22,12 +22,12 @@ done
 cp "${REPO_ROOT}/templates/php-fpm-pool.conf.template" "${DEPLOY_ROOT}/templates/"
 chown -R root:root "${DEPLOY_ROOT}"
 
-cp "${REPO_ROOT}/web/index.php" "${REPO_ROOT}/web/register_handler.php" /var/www/html/
+cp "${REPO_ROOT}/web/index.php" "${REPO_ROOT}/web/register_handler.php" "${REPO_ROOT}/web/confirm_handler.php" /var/www/html/
 cp "${REPO_ROOT}"/web/lib/*.php /var/www/html/lib/
 chown -R www-data:www-data /var/www/html
 
 cp "${REPO_ROOT}/templates/nginx-students.conf" /etc/nginx/sites-available/students
-install -d -o www-data -g www-data -m 700 /var/lib/5cs045-registrations /var/lib/5cs045-ratelimit /var/lib/5cs045-ip-ratelimit /var/lib/5cs045-registration-locks
+install -d -o www-data -g www-data -m 700 /var/lib/5cs045-registrations /var/lib/5cs045-ratelimit /var/lib/5cs045-ip-ratelimit /var/lib/5cs045-registration-locks /var/lib/5cs045-signup-links
 
 cp "${REPO_ROOT}/templates/sshd-students.conf" /etc/ssh/sshd_config.d/50-students.conf
 # The health check logs in over SSH with sshpass to test student sessions
