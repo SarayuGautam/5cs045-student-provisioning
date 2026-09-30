@@ -61,6 +61,28 @@ su -s /bin/bash www-data -c 'cat /srv/students/smoketest_a/assessment/sub/f.txt'
 su -s /bin/bash www-data -c 'echo tampered > /srv/students/smoketest_a/assessment/sub/f.txt' >/dev/null 2>&1 \
   && bad "www-data can write to student content" \
   || ok "www-data cannot write to student content"
+# Windows' built-in scp uploads folders as 700 and files as 600, which hides them from the web
+# server. bin/student-ssh-session.sh repairs that when the SSH session ends; this does the same.
+[[ "$(sshd -T -C "user=smoketest_a,host=localhost,addr=127.0.0.1" 2>/dev/null | awk '$1 == "forcecommand" { print $2 }')" == "${DEPLOY_ROOT}/bin/student-ssh-session.sh" ]] \
+  && ok "student SSH sessions go through student-ssh-session.sh" \
+  || bad "student SSH sessions do not go through student-ssh-session.sh (see /etc/ssh/sshd_config.d/50-students.conf)"
+if command -v sshpass >/dev/null; then
+  SSH_A=(timeout 20 sshpass -p "$PW_A" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=4 smoketest_a@localhost)
+  "${SSH_A[@]}" 'mkdir -m 700 ~/workshops/winupload && printf ok > ~/workshops/winupload/index.html && chmod 600 ~/workshops/winupload/index.html' >/dev/null 2>&1
+  CODE=""
+  for _ in $(seq 1 30); do
+    CODE="$(curl -k -s -o /dev/null -w '%{http_code}' "$BASE_URL/~smoketest_a/workshops/winupload/" 2>/dev/null)"
+    [[ "$CODE" == "200" ]] && break
+    sleep 0.5
+  done
+  [[ "$CODE" == "200" ]] \
+    && ok "files uploaded as 700/600 (Windows scp) are on the web once the SSH session ends" \
+    || bad "files uploaded as 700/600 (Windows scp) are not on the web (got HTTP $CODE)"
+  "${SSH_A[@]}" 'exit 42' >/dev/null 2>&1
+  [[ $? -eq 42 ]] && ok "SSH passes a command's exit status through" || bad "SSH did not pass a command's exit status through"
+else
+  echo "  SKIPPED: sshpass is not installed"
+fi
 
 echo ""
 echo "=== PHP-FPM process isolation ==="

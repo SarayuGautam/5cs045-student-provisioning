@@ -10,9 +10,16 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY_ROOT="/usr/local/sbin/5cs045"
 
 install -d "${DEPLOY_ROOT}/bin" "${DEPLOY_ROOT}/templates" /var/www/html/lib
-cp "${REPO_ROOT}"/bin/* "${DEPLOY_ROOT}/bin/"
+# Each script is replaced in one step, so a student login during the update never finds a
+# half-copied wrapper. Every student SSH session runs the two 755 ones (templates/sshd-students.conf).
+for f in "${REPO_ROOT}"/bin/*; do
+  name="$(basename "$f")"
+  mode=750
+  [[ "$name" == student-ssh-session.sh || "$name" == fix-web-access.sh ]] && mode=755
+  install -o root -g root -m "$mode" "$f" "${DEPLOY_ROOT}/bin/.${name}.new"
+  mv -f "${DEPLOY_ROOT}/bin/.${name}.new" "${DEPLOY_ROOT}/bin/${name}"
+done
 cp "${REPO_ROOT}/templates/php-fpm-pool.conf.template" "${DEPLOY_ROOT}/templates/"
-chmod 750 "${DEPLOY_ROOT}"/bin/*
 chown -R root:root "${DEPLOY_ROOT}"
 
 cp "${REPO_ROOT}/web/index.php" "${REPO_ROOT}/web/register_handler.php" /var/www/html/
@@ -23,6 +30,9 @@ cp "${REPO_ROOT}/templates/nginx-students.conf" /etc/nginx/sites-available/stude
 install -d -o www-data -g www-data -m 700 /var/lib/5cs045-registrations /var/lib/5cs045-ratelimit /var/lib/5cs045-ip-ratelimit /var/lib/5cs045-registration-locks
 
 cp "${REPO_ROOT}/templates/sshd-students.conf" /etc/ssh/sshd_config.d/50-students.conf
+# The health check logs in over SSH with sshpass to test student sessions
+command -v sshpass >/dev/null || apt-get install -y -qq sshpass >/dev/null 2>&1 \
+  || echo "    Could not install sshpass, so the health check will skip its SSH checks."
 sshd -t
 cp "${REPO_ROOT}/templates/fail2ban-5cs045.conf" /etc/fail2ban/jail.d/5cs045-sshd.conf
 

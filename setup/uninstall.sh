@@ -40,6 +40,7 @@ userdel 5cs045-admin 2>/dev/null || true
 rm -rf /etc/nginx/ssl/5cs045-selfsigned.*
 rm -f /etc/nginx/.htpasswd-admin /etc/nginx/.htpasswd-register
 rm -f /etc/ssh/sshd_config.d/50-students.conf
+systemctl try-reload-or-restart ssh 2>/dev/null || true
 rm -f /etc/sudoers.d/5cs045-provisioning
 rm -f /etc/fail2ban/jail.d/5cs045-sshd.conf
 rm -f /etc/systemd/system/php8.3-fpm.service.d/5cs045.conf

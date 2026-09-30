@@ -26,7 +26,7 @@ apt-get install -y -qq \
   nginx \
   php8.3-fpm php8.3-mysql php8.3-cli php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip \
   mariadb-server \
-  git composer acl unzip openssh-server phpmyadmin fail2ban sudo curl
+  git composer acl unzip openssh-server phpmyadmin fail2ban sudo curl sshpass
 
 echo "==> Creating student directories"
 mkdir -p /srv/students
@@ -38,6 +38,8 @@ mkdir -p "${DEPLOY_ROOT}/bin" "${DEPLOY_ROOT}/templates"
 cp "${REPO_ROOT}"/bin/* "${DEPLOY_ROOT}/bin/"
 cp "${REPO_ROOT}/templates/php-fpm-pool.conf.template" "${DEPLOY_ROOT}/templates/"
 chmod 750 "${DEPLOY_ROOT}"/bin/*
+# Every student SSH session runs these two (see templates/sshd-students.conf)
+chmod 755 "${DEPLOY_ROOT}/bin/student-ssh-session.sh" "${DEPLOY_ROOT}/bin/fix-web-access.sh"
 chown -R root:root "${DEPLOY_ROOT}"
 chmod -R go-w "${DEPLOY_ROOT}"
 
