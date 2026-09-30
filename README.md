@@ -190,10 +190,10 @@ These steps run on the student's own laptop. The example uses the demo project i
 
 ```bash
 # 1. Upload (the "/." puts the files straight into assessment/)
-scp -r demo-student-portfolio-blade/. sarayu_gautam@<server>:~/assessment/
+scp -P 50222 -r demo-student-portfolio-blade/. sarayu_gautam@<server>:~/assessment/
 
-# 2. Log in and finish the setup
-ssh sarayu_gautam@<server>
+# 2. Log in and finish the setup (SSH on this server is on port 50222, not 22)
+ssh -p 50222 sarayu_gautam@<server>
 cd ~/assessment
 composer install --no-dev
 cp config.example.php config.php
