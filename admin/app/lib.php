@@ -129,10 +129,13 @@ function api(string $action, array $args = []): mixed {
         return $answer['data'] ?? null;
     }
     $message = (string) ($answer['error'] ?? 'Something went wrong.');
-    if ($message === 'SESSION_EXPIRED' && $action !== 'login') {
+    if (in_array($message, ['SESSION_EXPIRED', 'ADMIN_ACCESS_REVOKED'], true) && $action !== 'login') {
+        $revoked = $message === 'ADMIN_ACCESS_REVOKED';
         $_SESSION = [];
         session_regenerate_id(true);
-        flash('info', 'You were signed out after 30 minutes without activity. Please sign in again.');
+        flash('info', $revoked
+            ? 'Your admin-panel access was removed by the superadmin.'
+            : 'You were signed out after 30 minutes without activity. Please sign in again.');
         if (str_ends_with((string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH), '.json')) {
             http_response_code(401);
             header('Content-Type: application/json');
