@@ -47,9 +47,11 @@ If a lab computer is blocked for too many wrong passwords, it shows at the top o
 | **Server** | Disk, memory and processor use, which services are running, and anything that needs attention. |
 | **Semester** | Add a whole class from a list of emails, run the health check, and remove every student at the end of term. |
 | **Security** | Blocked computers, which computers may open the panel, and a test email. |
-| **Logs** | Sign-ups, account changes, and everything done on the panel. |
+| **Logs** | Sign-ups, account changes, panel activity, and privileged SSH/sudo activity. |
 
 Long jobs (adding a class, the health check, removing everyone) run in the background, so you can leave their page and come back later.
+
+**Logs → Privileged / SSH** shows successful and failed SSH authentication for accounts with sudo, admin, or 5cs045-panel privileges, including the source IP for SSH authentication events. It also shows commands explicitly run through sudo. Student accounts are excluded. Ordinary shell commands are not recorded by sshd/auth.log, so the panel cannot claim to show every command typed in a privileged shell.
 
 ### Who can open the panel
 

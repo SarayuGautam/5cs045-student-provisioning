@@ -853,6 +853,278 @@ function online_users(): array {
     return $names;
 }
 
+
+/** True for server accounts allowed to administer the machine outside the panel. */
+function privileged_user(string $user): bool {
+    static $cache = [
+        'root' => true
+    ];
+
+    if (array_key_exists($user, $cache)) {
+        return $cache[$user];
+    }
+
+    if (!preg_match('/^[a-z_][a-z0-9_.-]{0,31}$/', $user)) {
+        return $cache[$user] = false;
+    }
+
+    $pw = posix_getpwnam($user);
+
+    if ($pw === false || (int) $pw['uid'] < 1000) {
+        return $cache[$user] = false;
+    }
+
+    [, $groups] = run([
+        'id',
+        '-nG',
+        $user
+    ]);
+
+    $groups = preg_split(
+        '/\s+/',
+        trim($groups),
+        -1,
+        PREG_SPLIT_NO_EMPTY
+    );
+
+    return $cache[$user] = (bool) array_intersect(
+        [
+            'sudo',
+            'admin',
+            '5cs045-panel'
+        ],
+        $groups
+    );
+}
+
+/** Pulls the timestamp and daemon message out of rsyslog or journalctl output. */
+function auth_log_parts(string $line): ?array {
+    if (preg_match(
+        '/^([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+\S+\s+(.*)$/',
+        $line,
+        $m
+    )) {
+        $year = (int) date('Y');
+        $time = strtotime($m[1] . ' ' . $year);
+
+        if ($time !== false && $time > time() + 86400) {
+            $time = strtotime($m[1] . ' ' . ($year - 1));
+        }
+
+        return $time === false
+            ? null
+            : ['time' => $time, 'message' => $m[2]];
+    }
+
+    if (preg_match(
+        '/^(\d{4}-\d{2}-\d{2}T[^\s]+)\s+\S+\s+(.*)$/',
+        $line,
+        $m
+    )) {
+        $time = strtotime($m[1]);
+
+        return $time === false
+            ? null
+            : ['time' => $time, 'message' => $m[2]];
+    }
+
+    return null;
+}
+
+/** Removes sshd/sudo's syslog prefix while leaving the event text intact. */
+function auth_daemon_message(string $message): string {
+    return preg_replace(
+        '/^(?:sshd|ssh|sudo)(?:\[\d+\])?:\s*/',
+        '',
+        $message
+    ) ?? $message;
+}
+
+/** Redacts common password arguments before a sudo command is displayed in the panel. */
+function redact_privileged_command(string $command): string {
+    $command = preg_replace(
+        '/(--password=)\S+/i',
+        '$1[REDACTED]',
+        $command
+    ) ?? $command;
+
+    $command = preg_replace(
+        '/(--password\s+)\S+/i',
+        '$1[REDACTED]',
+        $command
+    ) ?? $command;
+
+    $command = preg_replace(
+        '/(^|\s)-p(\S*)/',
+        '$1-p[REDACTED]',
+        $command
+    ) ?? $command;
+
+    $command = preg_replace(
+        '/(^|\s)-p\s+\S+/',
+        '$1-p [REDACTED]',
+        $command
+    ) ?? $command;
+
+    return $command;
+}
+
+/**
+ * Reads the OS authentication log and turns only privileged-account SSH/sudo activity into
+ * the same "[time] [address] user: action" format used by the other admin log tabs.
+ *
+ * Student accounts are excluded by privileged_user(). Normal shell commands are not available
+ * from sshd/auth.log; commands recorded by sudo are shown because those are explicit privilege
+ * escalations.
+ */
+function privileged_log(
+    int $lines,
+    string $filter
+): array {
+    $want = max(
+        10,
+        min($lines, 2000)
+    );
+
+    $raw = '';
+
+    foreach (
+        [
+            '/var/log/auth.log',
+            '/var/log/secure'
+        ] as $candidate
+    ) {
+        if (!is_readable($candidate)) {
+            continue;
+        }
+
+        [
+            $code,
+            $out
+        ] = run([
+            'tail',
+            '-n',
+            (string) min($want * 8, 10000),
+            $candidate
+        ]);
+
+        if ($code === 0 && trim($out) !== '') {
+            $raw = $out;
+            break;
+        }
+    }
+
+    if ($raw === '') {
+        [
+            $code,
+            $out
+        ] = run([
+            'journalctl',
+            '--no-pager',
+            '--output=short-iso',
+            '-n',
+            (string) min($want * 8, 10000)
+        ]);
+
+        if ($code === 0) {
+            $raw = $out;
+        }
+    }
+
+    if ($raw === '') {
+        return [];
+    }
+
+    $events = [];
+
+    foreach (explode("\n", $raw) as $line) {
+        $part = auth_log_parts($line);
+
+        if ($part === null) {
+            continue;
+        }
+
+        $message = auth_daemon_message($part['message']);
+
+        if (preg_match(
+            '/^Accepted\s+(\S+)\s+for\s+([a-zA-Z0-9_.-]+)\s+from\s+([0-9a-fA-F:.]+)\b/',
+            $message,
+            $m
+        ) && privileged_user($m[2])) {
+            $events[] = [
+                'time' => $part['time'],
+                'line' => sprintf(
+                    '[%s] [%s] %s: SSH login accepted via %s',
+                    date(DATE_ATOM, $part['time']),
+                    $m[3],
+                    $m[2],
+                    $m[1]
+                )
+            ];
+            continue;
+        }
+
+        if (preg_match(
+            '/^Failed\s+(\S+)\s+for\s+(?:invalid user\s+)?([a-zA-Z0-9_.-]+)\s+from\s+([0-9a-fA-F:.]+)\b/',
+            $message,
+            $m
+        ) && privileged_user($m[2])) {
+            $events[] = [
+                'time' => $part['time'],
+                'line' => sprintf(
+                    '[%s] [%s] %s: FAILED SSH login via %s',
+                    date(DATE_ATOM, $part['time']),
+                    $m[3],
+                    $m[2],
+                    $m[1]
+                )
+            ];
+            continue;
+        }
+
+        if (preg_match(
+            '/^([a-zA-Z0-9_.-]+)\s*:\s*TTY=.*?;\s*PWD=.*?;\s*USER=([a-zA-Z0-9_.-]+)\s*;\s*COMMAND=(.+)$/',
+            $message,
+            $m
+        ) && privileged_user($m[1])) {
+            $command = redact_privileged_command($m[3]);
+
+            $events[] = [
+                'time' => $part['time'],
+                'line' => sprintf(
+                    '[%s] %s: sudo as %s: %s (source IP is not recorded by sudo)',
+                    date(DATE_ATOM, $part['time']),
+                    $m[1],
+                    $m[2],
+                    $command
+                )
+            ];
+            continue;
+        }
+    }
+
+    if ($filter !== '') {
+        $events = array_values(array_filter(
+            $events,
+            fn(array $event): bool =>
+                stripos($event['line'], $filter) !== false
+        ));
+    }
+
+    usort(
+        $events,
+        fn(array $a, array $b): int =>
+            $b['time'] <=> $a['time']
+    );
+
+    $events = array_slice($events, 0, $want);
+
+    return array_map(
+        fn(array $event): string => $event['line'],
+        $events
+    );
+}
+
 function registry_records(): array {
     $map = [];
 
@@ -1283,6 +1555,13 @@ function tail_log(
     int $lines,
     string $filter
 ): array {
+    if ($which === 'privileged') {
+        return privileged_log(
+            $lines,
+            $filter
+        );
+    }
+
     $file =
         LOGS[$which] ??
         refuse('Unknown log.');
