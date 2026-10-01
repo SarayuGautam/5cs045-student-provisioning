@@ -82,3 +82,12 @@ Dangerous actions are confirmed inline by typing the name (or `DELETE <number>`)
 - **Browser test:** `test/admin-panel-e2e.js` covers every main flow in a real browser.
 - **Accessibility:** every page was checked with the axe-core scanner in light and dark mode and found no problems (WCAG 2.1 AA).
 - **Design review:** a separate reviewer compared screenshots at 1440px and 390px against the rules above, using the Impeccable, Taste-skill and Emil Kowalski guidance.
+
+
+## Permissions and account management
+
+The panel now has two roles. The `fullstack` account is the only superadmin; explicitly granted panel admins can use **Students** and **Server** only. Restricted pages show a clear explanation instead of simply disappearing.
+
+The **Security** page is a superadmin-only management surface for panel roles and non-student server accounts. Creating a non-student account shows its generated password once, and the account can optionally receive the admin role. These accounts are normal Linux users rather than student accounts.
+
+The visual distinction is intentionally textual rather than colour-only: the restricted state says, "You need super admin access to interact with [tab name]." The generated-password state reuses the existing secret/password presentation so credentials remain prominent without introducing a new visual language.
