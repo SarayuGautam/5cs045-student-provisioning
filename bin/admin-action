@@ -389,6 +389,65 @@ function panel_account_exists(string $user): bool {
         && !str_starts_with((string) $pw['dir'], STUDENT_ROOT . '/');
 }
 
+function admin_panel_url(): string {
+    $config = smtp();
+    $url = rtrim(trim((string) ($config['admin_panel_url'] ?? '')), '/');
+    $host = trim((string) parse_url($url, PHP_URL_HOST), '[]');
+
+    if (
+        $url === '' ||
+        $host === '' ||
+        filter_var($host, FILTER_VALIDATE_IP) !== false
+    ) {
+        return 'https://fullstack.heraldcollege.edu.np:8443';
+    }
+
+    return $url;
+}
+
+function admin_credentials_email_body(
+    string $username,
+    string $password
+): string {
+    return "Your 5CS045 admin-panel account is ready.\n\n" .
+        "Admin panel: " . admin_panel_url() . "\n" .
+        "Username: {$username}\n" .
+        "Password: {$password}\n\n" .
+        "Role: Students and Server (admin)\n\n" .
+        "Keep this email private. Do not forward the password. " .
+        "The fullstack account is the superadmin.\n";
+}
+
+function admin_credentials_email_html(
+    string $username,
+    string $password
+): string {
+    $safeUsername = htmlspecialchars($username, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $safePassword = htmlspecialchars($password, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $safePanel = htmlspecialchars(admin_panel_url(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+    return <<<HTML
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>5CS045 admin-panel account</title>
+</head>
+<body style="font-family:Arial,sans-serif;line-height:1.5;color:#222">
+  <p>Your 5CS045 admin-panel account is ready.</p>
+  <p><strong>Admin panel:</strong> <a href="{$safePanel}">{$safePanel}</a></p>
+  <table cellpadding="6" cellspacing="0" border="0">
+    <tr><td><strong>Username</strong></td><td>{$safeUsername}</td></tr>
+    <tr><td><strong>Password</strong></td><td>{$safePassword}</td></tr>
+    <tr><td><strong>Role</strong></td><td>Students and Server (admin)</td></tr>
+  </table>
+  <p>Keep this email private and do not forward the password.</p>
+  <p>The <strong>fullstack</strong> account is the superadmin.</p>
+</body>
+</html>
+HTML;
+}
+
 function panel_account_file(string $user): string {
     return PANEL_ACCOUNTS_DIR . '/' . $user . '.json';
 }
@@ -503,18 +562,33 @@ function create_panel_account(array $args, string $admin, string $ip): array {
         }
     }
 
+    $emailError = null;
+    if ($grantAdmin && $email !== '') {
+        $emailError = send_mail(
+            $email,
+            'Your 5CS045 admin-panel account',
+            admin_credentials_email_body($username, $password),
+            admin_credentials_email_html($username, $password)
+        );
+    }
+
     audit(
         $admin,
         $ip,
         'created non-student account ' . $username .
-        ($grantAdmin ? ' with admin-panel access' : '')
+        ($grantAdmin ? ' with admin-panel access' : '') .
+        ($email !== '' && $grantAdmin
+            ? ($emailError === null ? ' and emailed credentials' : ' but credential email failed')
+            : '')
     );
 
     return [
         'username' => $username,
         'password' => $password,
         'email' => $email,
-        'admin' => $grantAdmin
+        'admin' => $grantAdmin,
+        'email_sent' => $grantAdmin && $email !== '' && $emailError === null,
+        'email_error' => $emailError
     ];
 }
 
