@@ -23,6 +23,7 @@ const STUDENT_ROOT = '/srv/students';
 const WEB_LIB = '/var/www/html/lib';
 const SMTP_CONFIG = '/etc/5cs045/smtp_config.php';
 const AUTH_DIR = '/var/lib/5cs045-admin-auth';
+const ADMIN_USERS_FILE = AUTH_DIR . '/admin-users';
 const JOB_DIR = '/var/lib/5cs045-admin-jobs';
 const ADMIN_LOG = '/var/log/5cs045-admin.log';
 const ALLOW_FILE = '/etc/5cs045/admin-allow.conf';
@@ -327,7 +328,65 @@ function reload_later(): void {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Signing in
+// Panel roles and signing in
+
+function admin_users(): array {
+    $users = [];
+
+    foreach (@file(ADMIN_USERS_FILE, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+        $user = trim($line);
+        if (preg_match('/^[a-z_][a-z0-9_-]{0,31}$/', $user)) {
+            $users[$user] = true;
+        }
+    }
+
+    $users = array_keys($users);
+    sort($users, SORT_NATURAL);
+    return $users;
+}
+
+function admin_role(string $user): string {
+    if ($user === 'fullstack') {
+        return 'superadmin';
+    }
+
+    return in_array($user, admin_users(), true) ? 'admin' : '';
+}
+
+function write_admin_users(array $users): void {
+    $users = array_values(array_unique(array_filter(
+        $users,
+        fn($u) => preg_match('/^[a-z_][a-z0-9_-]{0,31}$/', (string) $u)
+    )));
+    sort($users, SORT_NATURAL);
+
+    file_put_contents(
+        ADMIN_USERS_FILE,
+        $users ? implode("\n", $users) . "\n" : '',
+        LOCK_EX
+    );
+    chmod(ADMIN_USERS_FILE, 0600);
+}
+
+function invalidate_user_sessions(string $user): void {
+    foreach (glob(AUTH_DIR . '/sessions/*') ?: [] as $file) {
+        $session = json_decode((string) @file_get_contents($file), true);
+        if (is_array($session) && ($session['user'] ?? '') === $user) {
+            @unlink($file);
+        }
+    }
+}
+
+function panel_account_exists(string $user): bool {
+    if (!preg_match('/^[a-z_][a-z0-9_-]{0,31}$/', $user)) {
+        return false;
+    }
+
+    $pw = posix_getpwnam($user);
+    return $pw !== false
+        && (int) $pw['uid'] >= 1000
+        && !str_starts_with((string) $pw['dir'], STUDENT_ROOT . '/');
+}
 
 function fail_file(
     string $kind,
@@ -362,9 +421,7 @@ function do_login(
     string $ip
 ): never {
     $user = arg($args, 'username');
-    $password = (string) (
-        $args['password'] ?? ''
-    );
+    $password = (string) ($args['password'] ?? '');
 
     @mkdir(
         AUTH_DIR . '/sessions',
@@ -382,10 +439,7 @@ function do_login(
 
         if (count($fails) >= MAX_FAILS) {
             $wait = (int) ceil(
-                (
-                    FAIL_WINDOW -
-                    (time() - min($fails))
-                ) / 60
+                (FAIL_WINDOW - (time() - min($fails))) / 60
             );
 
             refuse(
@@ -397,6 +451,7 @@ function do_login(
     }
 
     $ok = false;
+    $role = admin_role($user);
 
     $pw =
         preg_match(
@@ -407,67 +462,22 @@ function do_login(
         : false;
 
     if (
+        $role !== '' &&
         $pw !== false &&
-        $pw['uid'] >= 1000 &&
-        !str_starts_with(
-            (string) $pw['dir'],
-            STUDENT_ROOT . '/'
-        )
+        (int) $pw['uid'] >= 1000 &&
+        !str_starts_with((string) $pw['dir'], STUDENT_ROOT . '/')
     ) {
-        [, $groups] = run([
-            'id',
-            '-nG',
-            $user
-        ]);
+        [, $shadow] = run(['getent', 'shadow', $user]);
+        $hash = explode(':', trim($shadow))[1] ?? '';
 
-        $groups = preg_split(
-            '/\s+/',
-            trim($groups)
-        );
-
-        [, $shadow] = run([
-            'getent',
-            'shadow',
-            $user
-        ]);
-
-        $hash =
-            explode(
-                ':',
-                trim($shadow)
-            )[1] ?? '';
-
-        if (
-            array_intersect(
-                [
-                    'sudo',
-                    'admin',
-                    '5cs045-panel'
-                ],
-                $groups
-            ) &&
-            !in_array(
-                '5cs045-students',
-                $groups,
-                true
-            ) &&
-            $hash !== '' &&
-            !in_array(
-                $hash[0],
-                ['!', '*'],
-                true
-            )
-        ) {
+        if ($hash !== '' && !in_array($hash[0], ['!', '*'], true)) {
             [, $match] = run(
                 [
                     'perl',
                     '-e',
                     'chomp(my $p = <STDIN>); chomp(my $h = <STDIN>); print((crypt($p, $h) // "") eq $h ? "yes" : "no");'
                 ],
-                $password .
-                "\n" .
-                $hash .
-                "\n"
+                $password . "\n" . $hash . "\n"
             );
 
             $ok = $match === 'yes';
@@ -476,11 +486,7 @@ function do_login(
 
     if (!$ok) {
         foreach ($files as $f) {
-            file_put_contents(
-                $f,
-                time() . "\n",
-                FILE_APPEND | LOCK_EX
-            );
+            file_put_contents($f, time() . "\n", FILE_APPEND | LOCK_EX);
         }
 
         audit(
@@ -490,7 +496,7 @@ function do_login(
         );
 
         refuse(
-            'Wrong username or password, or this account cannot manage the server.'
+            'Wrong username or password, or this account has not been granted admin-panel access.'
         );
     }
 
@@ -498,33 +504,27 @@ function do_login(
         @unlink($f);
     }
 
-    $token = bin2hex(
-        random_bytes(32)
-    );
+    $token = bin2hex(random_bytes(32));
 
     $session = [
         'user' => $user,
+        'role' => $role,
         'ip' => $ip,
         'created' => time(),
         'seen' => time()
     ];
 
     file_put_contents(
-        AUTH_DIR .
-        '/sessions/' .
-        hash('sha256', $token),
+        AUTH_DIR . '/sessions/' . hash('sha256', $token),
         json_encode($session)
     );
 
-    audit(
-        $user,
-        $ip,
-        'signed in'
-    );
+    audit($user, $ip, 'signed in');
 
     reply([
         'token' => $token,
-        'user' => $user
+        'user' => $user,
+        'role' => $role
     ]);
 }
 
@@ -550,9 +550,13 @@ function check_token(
             : null;
 
     $now = time();
+    $role = is_array($s)
+        ? admin_role((string) ($s['user'] ?? ''))
+        : '';
 
     if (
         !is_array($s) ||
+        $role === '' ||
         ($s['ip'] ?? '') !== $ip ||
         $now - (int) $s['seen'] > IDLE_TIMEOUT ||
         $now - (int) $s['created'] > MAX_SESSION
@@ -564,6 +568,7 @@ function check_token(
         refuse('SESSION_EXPIRED');
     }
 
+    $s['role'] = $role;
     $s['seen'] = $now;
 
     file_put_contents(
@@ -2350,6 +2355,52 @@ $admin =
     );
 
 switch ($action) {
+    case 'admin-users':
+        if ($admin !== 'fullstack') {
+            refuse('SUPERADMIN_REQUIRED');
+        }
+        reply(admin_users());
+
+    case 'admin-grant':
+        if ($admin !== 'fullstack') {
+            refuse('SUPERADMIN_REQUIRED');
+        }
+
+        $target = arg($args, 'username');
+        if ($target === 'fullstack') {
+            refuse('The fullstack account is already the superadmin.');
+        }
+        if (!panel_account_exists($target)) {
+            refuse('That is not an existing non-student server account.');
+        }
+
+        $users = admin_users();
+        if (!in_array($target, $users, true)) {
+            $users[] = $target;
+            write_admin_users($users);
+            audit($admin, $ip, "granted admin role to {$target}");
+        }
+        reply(admin_users());
+
+    case 'admin-revoke':
+        if ($admin !== 'fullstack') {
+            refuse('SUPERADMIN_REQUIRED');
+        }
+
+        $target = arg($args, 'username');
+        if ($target === 'fullstack') {
+            refuse('The fullstack account is always the superadmin.');
+        }
+
+        $users = array_values(array_filter(
+            admin_users(),
+            fn(string $user): bool => $user !== $target
+        ));
+        write_admin_users($users);
+        invalidate_user_sessions($target);
+        audit($admin, $ip, "revoked admin role from {$target}");
+        reply(admin_users());
+
     case 'logout':
         @unlink(
             AUTH_DIR .
@@ -2370,7 +2421,8 @@ switch ($action) {
 
     case 'ping':
         reply([
-            'user' => $admin
+            'user' => $admin,
+            'role' => admin_role($admin)
         ]);
 
     case 'health':
