@@ -8,7 +8,7 @@ There are exactly two panel roles:
 
 | Role | Account | Panel access |
 |---|---|---|
-| superadmin | `fullstack` only | Students, Server, Semester, Security, Logs |
+| superadmin | `fullstack` only | Students, Server, Semester, Security, Admin accounts, Logs |
 | admin | Explicitly granted server account | Students and Server only |
 
 The `fullstack` username is the superadmin identity. It cannot be revoked from the panel.
@@ -45,7 +45,7 @@ The install script creates the first three with restrictive permissions.
 
 ## Non-student accounts
 
-The **Security** page lets the superadmin create a non-student server account.
+The **Admin accounts** page lets the superadmin create a non-student server account.
 
 A created account uses:
 
@@ -79,7 +79,7 @@ After deploying the role system:
 
 - `fullstack` remains superadmin.
 - Existing accounts are not automatically granted the new `admin` role.
-- To keep an existing non-student account as a panel admin, use **Security -> Panel administrators**.
+- To keep an existing non-student account as a panel admin, use **Admin accounts -> Panel administrators**.
 - The old `5cs045-panel` group may be removed after the VAPT accounts are no longer needed.
 
 ## Deployment
@@ -105,11 +105,11 @@ Do not edit the live PHP tree or `admin-users` manually unless recovering a brok
 
 Only the superadmin can:
 
-- grant or revoke the `admin` role;
+- grant or revoke the `admin` role from **Admin accounts**;
 - create non-student server accounts;
 - remove panel-managed non-student accounts;
 - change the admin allowlist;
-- use Security and Logs.
+- use Security, Admin accounts, and Logs.
 
 An `admin` can:
 
@@ -123,3 +123,16 @@ An `admin` cannot reach the Semester, Security, or Logs application paths succes
 Role changes and non-student account creation/removal are written to `/var/log/5cs045-admin.log`.
 
 The Logs page converts timestamps to the Nepal timezone (`Asia/Kathmandu`) for display.
+
+## Credential email
+
+When the superadmin creates a non-student account and checks the **admin** role, an email address can be supplied. The server then emails that new admin:
+
+- the admin-panel URL;
+- their username;
+- their generated password;
+- their `admin` role.
+
+The password is still shown once to the superadmin. A mail failure does not roll back account creation; the panel reports the error so the superadmin can deliver the password by another secure method.
+
+The URL comes from the optional `admin_panel_url` value in `/etc/5cs045/smtp_config.php`. If it is absent or contains an IP address, the default is `https://fullstack.heraldcollege.edu.np:8443`.
