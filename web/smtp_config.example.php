@@ -17,6 +17,8 @@ return [
     // lines the two addresses below are used.
     'server_url' => 'https://fullstack-student.heraldcollege.edu.np',
     'signup_url' => 'https://fullstack.heraldcollege.edu.np',
+    // Optional URL included in new admin credential emails. An IP address is ignored.
+    'admin_panel_url' => 'https://fullstack.heraldcollege.edu.np:8443',
     // Where server alerts go (for example "disk 80% full"). Leave empty for no alerts.
     'admin_email' => '',
 ];
