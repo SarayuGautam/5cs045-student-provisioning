@@ -46,7 +46,7 @@ If a lab computer is blocked for too many wrong passwords, it shows at the top o
 | **Students** | Find a student. Reset, email or show their password. Change their disk limit or remove them. Add a student. Unblock a lab computer. |
 | **Server** | Disk, memory and processor use, which services are running, and anything that needs attention. |
 | **Semester** | Add a whole class from a list of emails, run the health check, and remove every student at the end of term. |
-| **Security** | Blocked computers, which computers may open the panel, and a test email. |
+| **Security** | Blocked computers, panel allowlist, panel administrators, non-student server accounts, and test email. |
 | **Logs** | Sign-ups, account changes, panel activity, and privileged SSH/sudo activity. |
 
 Long jobs (adding a class, the health check, removing everyone) run in the background, so you can leave their page and come back later.
@@ -55,11 +55,12 @@ Long jobs (adding a class, the health check, removing everyone) run in the backg
 
 ### Who can open the panel
 
-Students never see it. Three things keep them out:
+Students never see it. Four layers matter:
 
 1. **Its own port.** The panel is on port 8443, the student site does not link to it, and it does not answer on the students' name.
 2. **The allowed list.** Only computers on the list can open it; everyone else gets "403 Forbidden". The first install allows the computer you ran it from. Change the list on the **Security** page.
-3. **A sudo password.** After 5 wrong passwords, that account and that computer have to wait 15 minutes.
+3. **A panel role.** Only the `fullstack` account is automatically allowed and it is the only **superadmin**. Other people need an explicit **admin** role.
+4. **A password.** The account's own Linux password is checked by `bin/admin-action`. After 5 wrong passwords, that account and that computer have to wait 15 minutes.
 
 You are signed out after 30 minutes without activity, and every change is recorded under **Logs → Admin panel**.
 
@@ -75,14 +76,53 @@ That adds the computer you are connected from. You can also:
 - Take an address off: `admin-allow.sh remove <address>`
 - Show the list: `admin-allow.sh`
 
-**How it stays safe:** the panel runs as its own user (`5cs045-admin`), which can do nothing except run one program, `bin/admin-action`. That program checks the sudo password itself, so a bug in the panel's pages cannot change the server without an admin's password.
+**Roles**
 
-**Giving someone panel access without sudo.** A sudo account can use the panel, but sudo is full control of the server. For anyone who should use the panel but not have that (for example security testers), put them in the `5cs045-panel` group instead. They can then do everything on the panel, but over SSH they are an ordinary user with no sudo:
+| Role | Access |
+|---|---|
+| `fullstack` / superadmin | Students, Server, Semester, Security, Logs, and admin/account management |
+| `admin` | Students and Server only |
+| student | No admin panel access |
+
+An admin who opens Semester, Security, or Logs sees a clear message that super admin access is required. The permission check is enforced by the server-side PHP entry point and again by `bin/admin-action`; hiding a tab in the browser is not the security boundary.
+
+**Creating a non-student server account**
+
+Only the `fullstack` superadmin can create or remove non-student server accounts from **Security**. A created account is a normal Linux account with a home directory and Bash, but it is not a student: it gets no student website folders, student database, student quota, or sudo.
+
+The form can also grant the **admin** panel role at creation time. The generated password is shown once in the panel. Save it securely and give it to the account owner.
+
+The old `5cs045-panel` Unix group is no longer used for panel authorization. Existing VAPT accounts from an older installation can remain as ordinary Linux accounts until the VAPT work is finished; remove their panel role and/or delete the account when you are ready.
+
+**Email vs username**
+
+A Linux username is globally unique on the server, so a student and a non-student account **cannot share the same username**.
+
+The email address is separate metadata. A non-student account **may use the same email address as a student account**. Student registration itself still allows only one student registration per email address.
+
+**How it stays safe:** the panel runs as its own user (`5cs045-admin`), which can do nothing except run one program, `bin/admin-action`. That program is the only root-capable path from the panel and it keeps the role allowlist and managed non-student account metadata root-owned.
+
+## Admin-account lifecycle and deployment
+
+The admin panel's persistent authorization state lives outside the web tree:
+
+- `/var/lib/5cs045-admin-auth/admin-users` - newline-separated usernames with the **admin** panel role.
+- `/var/lib/5cs045-admin-auth/accounts/<username>.json` - metadata for non-student accounts created through the panel.
+- `/var/lib/5cs045-admin-auth/sessions/` - short-lived signed session records.
+
+These files are root-owned and mode 0600/0700. The PHP panel user cannot edit them directly; all privileged changes go through `bin/admin-action`.
+
+After changing code, always deploy both the PHP panel and the root-owned server script:
 
 ```bash
-sudo adduser someone
-sudo usermod -aG 5cs045-panel someone
+cd /opt/5cs045-provisioning
+git pull
+sudo ./setup/update-server.sh
 ```
+
+A plain `git pull` does **not** update the live copy under `/var/www/5cs045-admin` or `/usr/local/sbin/5cs045/bin`.
+
+When moving an older server to the role system, the `5cs045-panel` group is legacy. It is no longer enough to grant panel access. Use **Security → Panel administrators** to grant the admin role explicitly.
 
 ## First-time setup
 
@@ -296,7 +336,7 @@ Everything on the panel also works over SSH, which is handy if the panel is down
 
 ```text
 admin/                      The admin panel (port 8443); admin/DESIGN.md explains its look
-bin/                        The server tools: add, remove and reset students, limits, admin-allow.sh
+bin/                        The server tools: student lifecycle, limits, admin roles/accounts, and admin-allow.sh
 setup/                      00-server-setup.sh (first time), update-server.sh (updates), uninstall.sh
 templates/                  nginx, PHP, SSH, fail2ban, sudo and cron settings
 test/smoke-test.sh          The health check
