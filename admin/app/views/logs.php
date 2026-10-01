@@ -3,6 +3,7 @@ $tabs = [
     'registration' => ['Registrations', 'Sign-ups on the public page, and why any failed.'],
     'provisioning' => ['Accounts', 'Accounts made and removed, limits applied, and warnings.'],
     'admin' => ['Admin panel', 'Every sign-in and change made on this panel.'],
+    'privileged' => ['Privileged / SSH', 'Privileged SSH logins and sudo commands. Student SSH activity is excluded.'],
 ];
 ?>
 <header class="page-head">
