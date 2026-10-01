@@ -24,6 +24,7 @@ const WEB_LIB = '/var/www/html/lib';
 const SMTP_CONFIG = '/etc/5cs045/smtp_config.php';
 const AUTH_DIR = '/var/lib/5cs045-admin-auth';
 const ADMIN_USERS_FILE = AUTH_DIR . '/admin-users';
+const PANEL_ACCOUNTS_DIR = AUTH_DIR . '/accounts';
 const JOB_DIR = '/var/lib/5cs045-admin-jobs';
 const ADMIN_LOG = '/var/log/5cs045-admin.log';
 const ALLOW_FILE = '/etc/5cs045/admin-allow.conf';
@@ -386,6 +387,166 @@ function panel_account_exists(string $user): bool {
     return $pw !== false
         && (int) $pw['uid'] >= 1000
         && !str_starts_with((string) $pw['dir'], STUDENT_ROOT . '/');
+}
+
+function panel_account_file(string $user): string {
+    return PANEL_ACCOUNTS_DIR . '/' . $user . '.json';
+}
+
+function panel_accounts(): array {
+    $accounts = [];
+
+    foreach (glob(PANEL_ACCOUNTS_DIR . '/*.json') ?: [] as $file) {
+        $record = json_decode((string) @file_get_contents($file), true);
+        if (!is_array($record) || !isset($record['username'])) {
+            continue;
+        }
+
+        $username = (string) $record['username'];
+        if (!preg_match('/^[a-z_][a-z0-9_-]{0,31}$/', $username)) {
+            continue;
+        }
+
+        $record['role'] = admin_role($username);
+        $accounts[] = $record;
+    }
+
+    usort($accounts, fn(array $a, array $b): int =>
+        strnatcasecmp((string) $a['username'], (string) $b['username'])
+    );
+
+    return $accounts;
+}
+
+function panel_password(): string {
+    $chars = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*';
+    $password = '';
+
+    for ($i = 0; $i < 20; $i++) {
+        $password .= $chars[random_int(0, strlen($chars) - 1)];
+    }
+
+    return $password;
+}
+
+function create_panel_account(array $args, string $admin, string $ip): array {
+    $username = arg($args, 'username');
+    $fullName = arg($args, 'full_name');
+    $email = strtolower(arg($args, 'email'));
+    $grantAdmin = !empty($args['grant_admin']);
+
+    if (!preg_match('/^[a-z_][a-z0-9_-]{2,31}$/', $username)) {
+        refuse('Username must be 3-32 lowercase letters, numbers, _ or -, starting with a letter or _.');
+    }
+
+    if ($username === 'fullstack') {
+        refuse('The fullstack account is reserved for the superadmin.');
+    }
+
+    if ($email !== '' && !valid_email($email)) {
+        refuse('That email address does not look right.');
+    }
+
+    if (posix_getpwnam($username) !== false) {
+        refuse("The username {$username} already exists.");
+    }
+
+    @mkdir(PANEL_ACCOUNTS_DIR, 0700, true);
+
+    $password = panel_password();
+    $comment = $fullName !== '' ? $fullName : '5CS045 admin panel account';
+
+    [$code, $out, $err] = run([
+        'useradd',
+        '--create-home',
+        '--shell',
+        '/bin/bash',
+        '--comment',
+        $comment,
+        $username
+    ]);
+
+    if ($code !== 0) {
+        refuse('Could not create that server account: ' . trim($err ?: $out));
+    }
+
+    [$code, $out, $err] = run(
+        ['chpasswd'],
+        $username . ':' . $password . "\n"
+    );
+
+    if ($code !== 0) {
+        run(['userdel', '-r', $username]);
+        refuse('The server account could not be given a password: ' . trim($err ?: $out));
+    }
+
+    $record = [
+        'username' => $username,
+        'full_name' => $fullName,
+        'email' => $email,
+        'created_by' => $admin,
+        'created_at' => date(DATE_ATOM),
+    ];
+
+    file_put_contents(
+        panel_account_file($username),
+        json_encode($record, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        LOCK_EX
+    );
+    chmod(panel_account_file($username), 0600);
+
+    if ($grantAdmin) {
+        $users = admin_users();
+        if (!in_array($username, $users, true)) {
+            $users[] = $username;
+            write_admin_users($users);
+        }
+    }
+
+    audit(
+        $admin,
+        $ip,
+        'created non-student account ' . $username .
+        ($grantAdmin ? ' with admin-panel access' : '')
+    );
+
+    return [
+        'username' => $username,
+        'password' => $password,
+        'email' => $email,
+        'admin' => $grantAdmin
+    ];
+}
+
+function delete_panel_account(string $username, string $admin, string $ip): void {
+    if (!is_file(panel_account_file($username))) {
+        refuse('That account was not created through the admin panel.');
+    }
+
+    if ($username === 'fullstack') {
+        refuse('The fullstack account cannot be removed from the panel.');
+    }
+
+    $pw = posix_getpwnam($username);
+    if ($pw === false || str_starts_with((string) $pw['dir'], STUDENT_ROOT . '/')) {
+        refuse('That is not a removable non-student account.');
+    }
+
+    $users = array_values(array_filter(
+        admin_users(),
+        fn(string $user): bool => $user !== $username
+    ));
+    write_admin_users($users);
+    invalidate_user_sessions($username);
+
+    [$code, $out, $err] = run(['userdel', '--remove', $username]);
+    if ($code !== 0) {
+        refuse('The account could not be removed: ' . trim($err ?: $out));
+    }
+
+    @unlink(panel_account_file($username));
+
+    audit($admin, $ip, "removed non-student account {$username}");
 }
 
 function fail_file(
@@ -2361,6 +2522,25 @@ $admin =
     );
 
 switch ($action) {
+    case 'panel-accounts':
+        if ($admin !== 'fullstack') {
+            refuse('SUPERADMIN_REQUIRED');
+        }
+        reply(panel_accounts());
+
+    case 'create-panel-account':
+        if ($admin !== 'fullstack') {
+            refuse('SUPERADMIN_REQUIRED');
+        }
+        reply(create_panel_account($args, $admin, $ip));
+
+    case 'delete-panel-account':
+        if ($admin !== 'fullstack') {
+            refuse('SUPERADMIN_REQUIRED');
+        }
+        delete_panel_account(arg($args, 'username'), $admin, $ip);
+        reply(true);
+
     case 'admin-users':
         if ($admin !== 'fullstack') {
             refuse('SUPERADMIN_REQUIRED');
