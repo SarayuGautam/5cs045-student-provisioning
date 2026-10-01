@@ -1,4 +1,4 @@
-<?php /** @var array $bans @var array $allow @var array $settings @var array $signins @var array $admin_users */
+<?php /** @var array $bans @var array $allow @var array $settings @var array $signins */
 $jails = [
     'sshd' => 'Blocked for an hour after 5 wrong SSH passwords in 10 minutes.',
     'recidive' => 'Blocked for a week after being blocked 3 times in one day.',
@@ -49,102 +49,6 @@ $stopped = array_filter($bans, fn($j) => !$j['running']);
     <div class="row"><button class="btn" type="submit" data-busy-text="Saving…">Save the list</button></div>
   </form>
   <p class="small muted">Locked out, or your laptop got a new address? SSH in and run <span class="mono">sudo /usr/local/sbin/5cs045/bin/admin-allow.sh add</span></p>
-</section>
-
-<?php if ($secret && ($secret['kind'] ?? '') === 'panel-account'): ?>
-<section class="secret" aria-labelledby="new-account-title">
-  <h2 id="new-account-title">New non-student account</h2>
-  <p class="muted">The password below is shown once. Store it securely or pass it to the account owner.</p>
-  <p><strong>Username:</strong> <span class="mono"><?= h($secret['username']) ?></span></p>
-  <p class="secret-pw"><span class="mono" id="new-account-password"><?= h($secret['password']) ?></span>
-    <button type="button" class="btn btn-small" data-copy="#new-account-password"><?= icon('copy') ?><span>Copy password</span></button>
-  </p>
-  <p class="small">
-    Panel admin: <?= !empty($secret['admin']) ? 'yes - Students and Server access' : 'no' ?>.
-    <?php if (($secret['email'] ?? '') !== ''): ?>Email: <?= h($secret['email']) ?>.<?php endif; ?>
-    This box goes away when you leave the page.
-  </p>
-</section>
-<?php endif; ?>
-
-<section class="section" id="panel-accounts" aria-labelledby="panel-accounts-title">
-  <h2 id="panel-accounts-title">Non-student server accounts</h2>
-  <p class="muted">These are normal Linux accounts, separate from student accounts. They do not get sudo, student websites, or student databases.</p>
-  <?php if ($panel_accounts): ?>
-    <ul class="blocked-list">
-      <?php foreach ($panel_accounts as $account): ?>
-        <li>
-          <span>
-            <span class="mono"><?= h($account['username']) ?></span>
-            <?php if (($account['full_name'] ?? '') !== ''): ?><span class="small muted"><?= h($account['full_name']) ?></span><?php endif; ?>
-            <?php if (($account['email'] ?? '') !== ''): ?><span class="small muted"><?= h($account['email']) ?></span><?php endif; ?>
-          </span>
-          <span class="row">
-            <?php if (($account['role'] ?? '') === 'admin'): ?><span class="small">Panel admin</span><?php endif; ?>
-            <form method="post" action="/security/delete-panel-account" data-busy>
-              <?= csrf_field() ?>
-              <input type="hidden" name="username" value="<?= h($account['username']) ?>">
-              <button class="btn btn-small" type="submit" data-busy-text="Removing…" onclick="return confirm('Remove this non-student server account and its home directory?')">Remove account</button>
-            </form>
-          </span>
-        </li>
-      <?php endforeach; ?>
-    </ul>
-  <?php else: ?>
-    <p class="nothing">No non-student accounts have been created through the panel.</p>
-  <?php endif; ?>
-
-  <form method="post" action="/security/create-panel-account" class="stack" data-busy>
-    <?= csrf_field() ?>
-    <label class="field">
-        <span class="label">Username</span>
-        <input type="text" name="username" pattern="[a-z_][a-z0-9_-]{2,31}" maxlength="32" autocomplete="off" required>
-    </label>
-    <label class="field">
-      <span class="label">Full name</span>
-      <input type="text" name="full_name" maxlength="100">
-    </label>
-    <label class="field">
-      <span class="label">Email <span class="muted">(optional)</span></span>
-      <input type="email" name="email" maxlength="254">
-      <span class="hint">This may be the same email address already used by a student account.</span>
-    </label>
-    <label class="check">
-      <input type="checkbox" name="grant_admin" value="1" checked>
-      <span>Give this account admin-panel access to Students and Server</span>
-    </label>
-    <button class="btn" type="submit" data-busy-text="Creating…">Create non-student account</button>
-  </form>
-</section>
-
-<section class="section" id="panel-admins" aria-labelledby="panel-admins-title">
-  <h2 id="panel-admins-title">Panel administrators</h2>
-  <p class="muted">The <span class="mono">fullstack</span> account is the only superadmin. People listed here can use the Students and Server tabs only.</p>
-  <?php if ($admin_users): ?>
-    <ul class="blocked-list">
-      <?php foreach ($admin_users as $user): ?>
-        <li>
-          <span class="mono"><?= h($user) ?></span>
-          <form method="post" action="/security/admin-revoke" data-busy>
-            <?= csrf_field() ?>
-            <input type="hidden" name="username" value="<?= h($user) ?>">
-            <button class="btn btn-small" type="submit" data-busy-text="Removing…">Remove admin access</button>
-          </form>
-        </li>
-      <?php endforeach; ?>
-    </ul>
-  <?php else: ?>
-    <p class="nothing">No panel admins have been added yet.</p>
-  <?php endif; ?>
-  <form method="post" action="/security/admin-grant" class="inline-form" data-busy>
-    <?= csrf_field() ?>
-    <label class="field">
-      <span class="label">Server username</span>
-      <input type="text" name="username" pattern="[a-z_][a-z0-9_-]{2,31}" maxlength="32" autocomplete="off" required>
-      <span class="hint">This must be an existing non-student server account with a password.</span>
-    </label>
-    <button class="btn" type="submit" data-busy-text="Granting…">Give admin access</button>
-  </form>
 </section>
 
 <section class="section" id="email" aria-labelledby="email-title">
