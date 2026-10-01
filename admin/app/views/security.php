@@ -1,4 +1,4 @@
-<?php /** @var array $bans @var array $allow @var array $settings @var array $signins */
+<?php /** @var array $bans @var array $allow @var array $settings @var array $signins @var array $admin_users */
 $jails = [
     'sshd' => 'Blocked for an hour after 5 wrong SSH passwords in 10 minutes.',
     'recidive' => 'Blocked for a week after being blocked 3 times in one day.',
@@ -49,6 +49,36 @@ $stopped = array_filter($bans, fn($j) => !$j['running']);
     <div class="row"><button class="btn" type="submit" data-busy-text="Saving…">Save the list</button></div>
   </form>
   <p class="small muted">Locked out, or your laptop got a new address? SSH in and run <span class="mono">sudo /usr/local/sbin/5cs045/bin/admin-allow.sh add</span></p>
+</section>
+
+<section class="section" id="panel-admins" aria-labelledby="panel-admins-title">
+  <h2 id="panel-admins-title">Panel administrators</h2>
+  <p class="muted">The <span class="mono">fullstack</span> account is the only superadmin. People listed here can use the Students and Server tabs only.</p>
+  <?php if ($admin_users): ?>
+    <ul class="blocked-list">
+      <?php foreach ($admin_users as $user): ?>
+        <li>
+          <span class="mono"><?= h($user) ?></span>
+          <form method="post" action="/security/admin-revoke" data-busy>
+            <?= csrf_field() ?>
+            <input type="hidden" name="username" value="<?= h($user) ?>">
+            <button class="btn btn-small" type="submit" data-busy-text="Removing…">Remove admin access</button>
+          </form>
+        </li>
+      <?php endforeach; ?>
+    </ul>
+  <?php else: ?>
+    <p class="nothing">No panel admins have been added yet.</p>
+  <?php endif; ?>
+  <form method="post" action="/security/admin-grant" class="inline-form" data-busy>
+    <?= csrf_field() ?>
+    <label class="field">
+      <span class="label">Server username</span>
+      <input type="text" name="username" pattern="[a-z_][a-z0-9_-]{2,31}" maxlength="32" autocomplete="off" required>
+      <span class="hint">This must be an existing non-student server account with a password.</span>
+    </label>
+    <button class="btn" type="submit" data-busy-text="Granting…">Give admin access</button>
+  </form>
 </section>
 
 <section class="section" id="email" aria-labelledby="email-title">
