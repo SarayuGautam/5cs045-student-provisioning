@@ -1062,8 +1062,7 @@ function privileged_user(string $user): bool {
     return $cache[$user] = (bool) array_intersect(
         [
             'sudo',
-            'admin',
-            '5cs045-panel'
+            'admin'
         ],
         $groups
     );
