@@ -32,7 +32,7 @@ The username cannot match a student username because Linux usernames are globall
 
 Once the VAPT test is confirmed complete:
 
-1. Use **Security -> Panel administrators** to revoke the temporary account's admin role, if it is still present.
+1. Use **Admin accounts -> Panel administrators** to revoke the temporary account's admin role, if it is still present.
 2. If the account was created through the panel, use **Admin accounts -> Non-student server accounts -> Remove account** to delete the Linux account and its home directory.
 3. Delete any temporary student/VAPT student accounts using the normal student removal flow.
 4. Remove any legacy `5cs045-panel` group membership left by an older deployment.
@@ -41,7 +41,7 @@ Do not delete the `fullstack` account.
 
 ## Recovery for a legacy VAPT account
 
-If `vapt_panel` already existed before the role system was deployed, it is not automatically a panel admin. The superadmin can grant it the `admin` role from **Security -> Panel administrators**. The old `5cs045-panel` group is not required.
+If `vapt_panel` already existed before the role system was deployed, it is not automatically a panel admin. The superadmin can grant it the `admin` role from **Admin accounts -> Panel administrators**. The old `5cs045-panel` group is not required.
 
 ## Deployment reminder
 
