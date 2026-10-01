@@ -1,9 +1,31 @@
-<?php /** @var string $log @var int $lines @var string $filter @var array $rows */
+<?php
+/** @var string $log @var int $lines @var array $filters @var array $rows */
 $tabs = [
     'registration' => ['Registrations', 'Sign-ups on the public page, and why any failed.'],
     'provisioning' => ['Accounts', 'Accounts made and removed, limits applied, and warnings.'],
     'admin' => ['Admin panel', 'Every sign-in and change made on this panel.'],
     'privileged' => ['Privileged / SSH', 'Privileged SSH logins and sudo commands. Student SSH activity is excluded.'],
+];
+
+$columns = [
+    'registration' => ['time', 'event', 'ip'],
+    'provisioning' => ['time', 'event'],
+    'admin' => ['time', 'user', 'event', 'ip'],
+    'privileged' => ['time', 'user', 'event', 'ip'],
+];
+
+$columnLabels = [
+    'time' => 'Time',
+    'user' => 'User',
+    'event' => 'Event / Details',
+    'ip' => 'IP address',
+];
+
+$columnPlaceholders = [
+    'time' => 'Filter time',
+    'user' => 'Filter user',
+    'event' => 'Filter event or command',
+    'ip' => 'Filter IP',
 ];
 ?>
 <header class="page-head">
