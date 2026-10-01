@@ -24,6 +24,11 @@ getent group 5cs045-panel >/dev/null || groupadd 5cs045-panel
 
 # State kept by admin-action (root only)
 install -d -o root -g root -m 700 /var/lib/5cs045-admin-auth /var/lib/5cs045-admin-jobs /var/lib/5cs045-quota-overrides
+if [[ ! -f /var/lib/5cs045-admin-auth/admin-users ]]; then
+  touch /var/lib/5cs045-admin-auth/admin-users
+  chown root:root /var/lib/5cs045-admin-auth/admin-users
+  chmod 600 /var/lib/5cs045-admin-auth/admin-users
+fi
 touch /var/log/5cs045-admin.log
 chmod 600 /var/log/5cs045-admin.log
 
