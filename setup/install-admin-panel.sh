@@ -17,18 +17,19 @@ if ! id "$PANEL_USER" &>/dev/null; then
 fi
 install -d -o "$PANEL_USER" -g "$PANEL_USER" -m 700 /var/lib/5cs045-admin /var/lib/5cs045-admin/sessions
 
-# Accounts in this group can sign in to the panel without having sudo on the server.
-# Use it for anyone who needs the panel but should not be a full admin (for example VAPT testers):
-#   sudo adduser vapt_panel && sudo usermod -aG 5cs045-panel vapt_panel
-getent group 5cs045-panel >/dev/null || groupadd 5cs045-panel
-
+# Panel access is now controlled by the root-owned admin-users file.
+# The fullstack account is always the superadmin. Other panel admins are granted from
+# the Security page after they have a normal, non-student Linux account.
+#
 # State kept by admin-action (root only)
-install -d -o root -g root -m 700 /var/lib/5cs045-admin-auth /var/lib/5cs045-admin-jobs /var/lib/5cs045-quota-overrides
+install -d -o root -g root -m 700 /var/lib/5cs045-admin-auth /var/lib/5cs045-admin-auth/accounts /var/lib/5cs045-admin-jobs /var/lib/5cs045-quota-overrides
 if [[ ! -f /var/lib/5cs045-admin-auth/admin-users ]]; then
   touch /var/lib/5cs045-admin-auth/admin-users
   chown root:root /var/lib/5cs045-admin-auth/admin-users
   chmod 600 /var/lib/5cs045-admin-auth/admin-users
 fi
+chown root:root /var/lib/5cs045-admin-auth/accounts
+chmod 700 /var/lib/5cs045-admin-auth/accounts
 touch /var/log/5cs045-admin.log
 chmod 600 /var/log/5cs045-admin.log
 
