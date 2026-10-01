@@ -52,15 +52,18 @@ $stopped = array_filter($bans, fn($j) => !$j['running']);
 </section>
 
 <?php if ($secret && ($secret['kind'] ?? '') === 'panel-account'): ?>
-<section class="section" aria-labelledby="new-account-title">
+<section class="secret" aria-labelledby="new-account-title">
   <h2 id="new-account-title">New non-student account</h2>
   <p class="muted">The password below is shown once. Store it securely or pass it to the account owner.</p>
-  <dl class="details">
-    <div><dt>Username</dt><dd class="mono"><?= h($secret['username']) ?></dd></div>
-    <div><dt>Password</dt><dd class="mono"><?= h($secret['password']) ?></dd></div>
-    <div><dt>Panel admin</dt><dd><?= !empty($secret['admin']) ? 'Yes - Students and Server access' : 'No' ?></dd></div>
-    <?php if (($secret['email'] ?? '') !== ''): ?><div><dt>Email</dt><dd><?= h($secret['email']) ?></dd></div><?php endif; ?>
-  </dl>
+  <p><strong>Username:</strong> <span class="mono"><?= h($secret['username']) ?></span></p>
+  <p class="secret-pw"><span class="mono" id="new-account-password"><?= h($secret['password']) ?></span>
+    <button type="button" class="btn btn-small" data-copy="#new-account-password"><?= icon('copy') ?><span>Copy password</span></button>
+  </p>
+  <p class="small">
+    Panel admin: <?= !empty($secret['admin']) ? 'yes - Students and Server access' : 'no' ?>.
+    <?php if (($secret['email'] ?? '') !== ''): ?>Email: <?= h($secret['email']) ?>.<?php endif; ?>
+    This box goes away when you leave the page.
+  </p>
 </section>
 <?php endif; ?>
 
@@ -93,16 +96,14 @@ $stopped = array_filter($bans, fn($j) => !$j['running']);
 
   <form method="post" action="/security/create-panel-account" class="stack" data-busy>
     <?= csrf_field() ?>
-    <div class="grid-2">
-      <label class="field">
+    <label class="field">
         <span class="label">Username</span>
         <input type="text" name="username" pattern="[a-z_][a-z0-9_-]{2,31}" maxlength="32" autocomplete="off" required>
-      </label>
-      <label class="field">
-        <span class="label">Full name</span>
-        <input type="text" name="full_name" maxlength="100">
-      </label>
-    </div>
+    </label>
+    <label class="field">
+      <span class="label">Full name</span>
+      <input type="text" name="full_name" maxlength="100">
+    </label>
     <label class="field">
       <span class="label">Email <span class="muted">(optional)</span></span>
       <input type="email" name="email" maxlength="254">
