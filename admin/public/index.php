@@ -242,7 +242,7 @@ try {
 
     // Logs
     if ($path === '/logs' && !$post) {
-        $log = in_array($_GET['log'] ?? '', ['registration', 'provisioning', 'admin'], true) ? $_GET['log'] : 'registration';
+        $log = in_array($_GET['log'] ?? '', ['registration', 'provisioning', 'admin', 'privileged'], true) ? $_GET['log'] : 'registration';
         $lines = in_array((int) ($_GET['lines'] ?? 300), [100, 300, 1000], true) ? (int) ($_GET['lines'] ?? 300) : 300;
         $filter = substr(trim((string) ($_GET['q'] ?? '')), 0, 100);
         render('logs', ['title' => 'Logs', 'nav' => 'logs', 'log' => $log, 'lines' => $lines, 'filter' => $filter,
