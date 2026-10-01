@@ -116,7 +116,7 @@ An `admin` can:
 - work with student accounts;
 - inspect server health and services.
 
-An `admin` cannot reach the Semester, Security, or Logs application paths successfully, even if they submit the URL directly.
+An `admin` cannot reach the Semester, Security, Admin accounts, or Logs application paths successfully, even if they submit the URL directly.
 
 ## Logging
 
