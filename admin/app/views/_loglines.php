@@ -84,7 +84,19 @@ function log_table_fields(string $line): array {
           <?php foreach ($columns as $column): ?>
             <?php if ($column === 'time'): ?>
               <td class="log-time">
-                <?= $row['time'] !== '' ? h(date('j M Y, H:i:s', strtotime($row['time']) ?: time())) : '—' ?>
+                <?php
+                if ($row['time'] !== '') {
+                    try {
+                        $localTime = (new DateTimeImmutable($row['time']))
+                            ->setTimezone(new DateTimeZone('Asia/Kathmandu'));
+                        echo h($localTime->format('j M Y, H:i:s'));
+                    } catch (Exception $e) {
+                        echo h($row['time']);
+                    }
+                } else {
+                    echo '—';
+                }
+                ?>
               </td>
             <?php elseif ($column === 'user'): ?>
               <td class="log-user mono"><?= $row['user'] !== '' ? h($row['user']) : '—' ?></td>
