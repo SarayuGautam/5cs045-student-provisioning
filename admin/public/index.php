@@ -68,6 +68,9 @@ if ($_SESSION['role'] === 'admin') {
     } elseif (preg_match('#^/security(?:/|$)#', $path)) {
         $restrictedTab = 'Security';
         $restrictedNav = 'security';
+    } elseif (preg_match('#^/accounts(?:/|$)#', $path)) {
+        $restrictedTab = 'Admin accounts';
+        $restrictedNav = 'accounts';
     } elseif ($path === '/logs') {
         $restrictedTab = 'Logs';
         $restrictedNav = 'logs';
@@ -243,15 +246,28 @@ try {
 
     // Security
     if ($path === '/security' && !$post) {
-        render('security', ['title' => 'Security', 'nav' => 'security', 'bans' => api('bans'),
-            'allow' => api('allowlist'), 'settings' => api('settings'),
+        render('security', [
+            'title' => 'Security',
+            'nav' => 'security',
+            'bans' => api('bans'),
+            'allow' => api('allowlist'),
+            'settings' => api('settings'),
+            'signins' => array_slice(api('logs', ['log' => 'admin', 'lines' => 500, 'filter' => 'sign']), 0, 12),
+        ]);
+    }
+
+    // Superadmin account and panel-role management
+    if ($path === '/accounts' && !$post) {
+        render('admin-accounts', [
+            'title' => 'Admin accounts',
+            'nav' => 'accounts',
             'admin_users' => api('admin-users'),
             'panel_accounts' => api('panel-accounts'),
             'secret' => take_secret(),
-            'signins' => array_slice(api('logs', ['log' => 'admin', 'lines' => 500, 'filter' => 'sign']), 0, 12)]);
+        ]);
     }
 
-    if (preg_match('#^/security/(admin-grant|admin-revoke|create-panel-account|delete-panel-account|unban|allowlist|test-email)$#', $path, $m) && $post) {
+    if (preg_match('#^/accounts/(admin-grant|admin-revoke|create-panel-account|delete-panel-account)$#', $path, $m) && $post) {
         try {
             switch ($m[1]) {
                 case 'create-panel-account':
@@ -268,29 +284,52 @@ try {
                         'password' => $r['password'],
                         'admin' => $r['admin'],
                         'email' => $r['email'],
+                        'email_sent' => $r['email_sent'],
+                        'email_error' => $r['email_error'],
                     ]);
-                    flash('success', "{$r['username']} was created as a non-student server account.");
+                    flash(
+                        $r['email_error'] ? 'info' : 'success',
+                        $r['email_error']
+                            ? "{$r['username']} was created, but the credential email could not be sent."
+                            : "{$r['username']} was created as a non-student admin account."
+                    );
                     break;
+
                 case 'delete-panel-account':
                     api('delete-panel-account', ['username' => trim((string) ($_POST['username'] ?? ''))]);
                     flash('success', 'The non-student server account was removed.');
                     break;
+
                 case 'admin-grant':
                     api('admin-grant', ['username' => trim((string) ($_POST['username'] ?? ''))]);
                     flash('success', 'Admin access granted.');
                     break;
+
                 case 'admin-revoke':
                     api('admin-revoke', ['username' => trim((string) ($_POST['username'] ?? ''))]);
                     flash('success', 'Admin access removed.');
                     break;
+            }
+        } catch (ApiError $e) {
+            flash('error', $e->getMessage());
+        }
+
+        redirect('/accounts');
+    }
+
+    if (preg_match('#^/security/(unban|allowlist|test-email)$#', $path, $m) && $post) {
+        try {
+            switch ($m[1]) {
                 case 'unban':
                     $r = api('unban', ['jail' => (string) ($_POST['jail'] ?? ''), 'address' => (string) ($_POST['address'] ?? '')]);
                     flash('success', "{$r['address']} is unblocked and can try again.");
                     break;
+
                 case 'allowlist':
                     api('allowlist-set', ['entries' => (string) ($_POST['entries'] ?? '')]);
                     flash('success', 'Saved. Only the listed computers can open this panel.');
                     break;
+
                 case 'test-email':
                     $r = api('test-email', ['email' => trim((string) ($_POST['email'] ?? ''))]);
                     flash('success', "A test email was sent to {$r['emailed']}. It should arrive within a minute.");
@@ -299,7 +338,8 @@ try {
         } catch (ApiError $e) {
             flash('error', $e->getMessage());
         }
-        redirect(($_POST['back'] ?? '') === '/' ? '/' : '/security');
+
+        redirect('/security');
     }
 
     // Logs
