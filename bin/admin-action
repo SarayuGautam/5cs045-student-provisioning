@@ -554,9 +554,15 @@ function check_token(
         ? admin_role((string) ($s['user'] ?? ''))
         : '';
 
+    if (!is_array($s) || $role === '') {
+        if (is_file($file)) {
+            unlink($file);
+        }
+
+        refuse(is_array($s) ? 'ADMIN_ACCESS_REVOKED' : 'SESSION_EXPIRED');
+    }
+
     if (
-        !is_array($s) ||
-        $role === '' ||
         ($s['ip'] ?? '') !== $ip ||
         $now - (int) $s['seen'] > IDLE_TIMEOUT ||
         $now - (int) $s['created'] > MAX_SESSION
