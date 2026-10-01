@@ -5,6 +5,7 @@ $items = [
     'server' => ['/server', 'Server'],
     'semester' => ['/semester', 'Semester'],
     'security' => ['/security', 'Security'],
+    'accounts' => ['/accounts', 'Admin accounts'],
     'logs' => ['/logs', 'Logs'],
 ];
 $flashesInPanel = $flashes_in_panel ?? false;
