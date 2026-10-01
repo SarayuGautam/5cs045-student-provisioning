@@ -415,23 +415,22 @@ input[type="search"]::-webkit-search-cancel-button { appearance: none; -webkit-a
 .log-table tbody tr:hover { background: var(--bg-3); }
 .log-filter-row th { padding: 8px 10px; background: var(--bg-2); text-transform: none; letter-spacing: 0; }
 .log-filter-row input { width: 100%; min-width: 0; height: 38px; padding: 0 10px; font: 0.84rem var(--mono); border: 1px solid var(--line); border-radius: var(--r-control); background: var(--bg); color: var(--ink); }
-.log-time { width: 11rem; white-space: nowrap; color: var(--ink-2); font-size: 0.86rem; }
-.log-user { width: 9rem; white-space: nowrap; }
-.log-ip { width: 9.5rem; white-space: nowrap; }
+.log-time { color: var(--ink-2); font-size: 0.86rem; }
+.log-user, .log-ip { overflow-wrap: anywhere; }
 .log-event { width: auto; }
-.log-table-registration .log-col-time { width: 11rem; }
-.log-table-registration .log-col-event { width: auto; }
-.log-table-registration .log-col-ip { width: 9.5rem; }
-.log-table-provisioning .log-col-time { width: 11rem; }
-.log-table-provisioning .log-col-event { width: auto; }
+.log-table-registration .log-col-time { width: 22%; }
+.log-table-registration .log-col-event { width: 58%; }
+.log-table-registration .log-col-ip { width: 20%; }
+.log-table-provisioning .log-col-time { width: 22%; }
+.log-table-provisioning .log-col-event { width: 78%; }
 .log-table-admin .log-col-time,
-.log-table-privileged .log-col-time { width: 11rem; }
+.log-table-privileged .log-col-time { width: 20%; }
 .log-table-admin .log-col-user,
-.log-table-privileged .log-col-user { width: 9rem; }
+.log-table-privileged .log-col-user { width: 15%; }
 .log-table-admin .log-col-ip,
-.log-table-privileged .log-col-ip { width: 9.5rem; }
+.log-table-privileged .log-col-ip { width: 20%; }
 .log-table-admin .log-col-event,
-.log-table-privileged .log-col-event { width: auto; }
+.log-table-privileged .log-col-event { width: 45%; }
 .log-badge { display: inline-flex; align-items: center; margin-right: 9px; padding: 4px 7px; border-radius: 999px; font: 700 0.68rem/1 var(--mono); letter-spacing: 0.04em; background: var(--bg-3); color: var(--ink-2); vertical-align: middle; }
 .log-badge-bad { background: var(--red-wash); color: var(--red-ink); }
 .log-badge-ssh { background: var(--bg-3); color: var(--ink); }
@@ -461,9 +460,20 @@ input[type="search"]::-webkit-search-cancel-button { appearance: none; -webkit-a
 
 @media (max-width: 900px) {
   .log-table th, .log-table td { padding: 11px 10px; }
-  .log-time { width: 8.8rem; font-size: 0.8rem; }
-  .log-user { width: 7rem; }
-  .log-ip { width: 7.8rem; }
+  .log-time { font-size: 0.8rem; }
+  .log-table-registration .log-col-time { width: 24%; }
+  .log-table-registration .log-col-event { width: 54%; }
+  .log-table-registration .log-col-ip { width: 22%; }
+  .log-table-provisioning .log-col-time { width: 24%; }
+  .log-table-provisioning .log-col-event { width: 76%; }
+  .log-table-admin .log-col-time,
+  .log-table-privileged .log-col-time { width: 21%; }
+  .log-table-admin .log-col-user,
+  .log-table-privileged .log-col-user { width: 16%; }
+  .log-table-admin .log-col-event,
+  .log-table-privileged .log-col-event { width: 43%; }
+  .log-table-admin .log-col-ip,
+  .log-table-privileged .log-col-ip { width: 20%; }
   .log-filter-spacer { flex-basis: 120px; }
   .topbar { flex-wrap: wrap; height: auto; gap: 0 16px; padding: 10px 16px 0; }
   .nav { order: 3; width: 100%; overflow-x: auto; scrollbar-width: none; margin: 6px -10px 0; padding-bottom: 6px; gap: 0; }
