@@ -3,7 +3,7 @@
   <div class="login-box">
     <p class="wordmark">5CS045 <span>admin</span></p>
     <h1>Sign in</h1>
-    <p class="muted">Use the server's sudo account, the same one you use for SSH.</p>
+    <p class="muted">Use a server account that has been granted access to this admin panel. The fullstack account is the superadmin.</p>
     <?php require __DIR__ . '/_flashes.php'; ?>
     <?php if ($error): ?>
       <div class="flash flash-error" role="alert"><?= icon('alert') ?><p><?= h($error) ?></p></div>
