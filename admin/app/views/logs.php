@@ -17,22 +17,24 @@ $tabs = [
   <?php endforeach; ?>
 </nav>
 
-<form method="get" action="/logs" class="filter">
+<form id="log-filters" method="get" action="/logs" class="log-filter-form">
   <input type="hidden" name="log" value="<?= h($log) ?>">
-  <label class="finder finder-small">
-    <?= icon('search') ?>
-    <input type="search" name="q" value="<?= h($filter) ?>" placeholder="Username, address or FAILED" aria-label="Filter">
-  </label>
+  <div class="log-filter-spacer" aria-hidden="true"></div>
   <select name="lines" aria-label="How far back" data-autosubmit>
     <?php foreach ([100, 300, 1000] as $n): ?>
       <option value="<?= $n ?>"<?= $n === $lines ? ' selected' : '' ?>>Last <?= $n ?> lines</option>
     <?php endforeach; ?>
   </select>
-  <button class="btn" type="submit">Filter</button>
+  <button class="btn" type="submit">Apply filters</button>
+  <a class="btn btn-quiet" href="/logs?log=<?= h($log) ?>">Clear</a>
 </form>
 
 <?php if (!$rows): ?>
-  <p class="nothing"><?= $filter !== '' ? 'No lines match "' . h($filter) . '".' : 'Nothing has been written to this log yet.' ?></p>
+  <?php
+    $activeFilters = array_filter($filters ?? [], fn(string $v): bool => $v !== '');
+    $filterSummary = $activeFilters ? 'the selected filters' : 'the current log';
+  ?>
+  <p class="nothing">No entries match <?= h($filterSummary) ?>.</p>
 <?php else: ?>
   <?php require __DIR__ . '/_loglines.php'; ?>
 <?php endif; ?>
