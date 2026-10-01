@@ -6,9 +6,9 @@ This is the current procedure for temporary VAPT access. It replaces the older `
 
 Use the `fullstack` superadmin account.
 
-1. Open **Security -> Non-student server accounts**.
+1. Open **Admin accounts -> Non-student server accounts**.
 2. Create a username such as `vapt_panel`, add the tester's name/email if useful, and leave **Give this account admin-panel access** checked when the tester needs the panel.
-3. The panel generates a Linux password and shows it once.
+3. The panel generates a Linux password and shows it once. If an email address is provided and the admin role is granted, the panel also emails the credentials.
 4. Give the tester only the credentials and access they actually need.
 
 The created account is a normal Linux account. It does not receive sudo, student websites, a student database, or student quota settings.
@@ -33,7 +33,7 @@ The username cannot match a student username because Linux usernames are globall
 Once the VAPT test is confirmed complete:
 
 1. Use **Security -> Panel administrators** to revoke the temporary account's admin role, if it is still present.
-2. If the account was created through the panel, use **Security -> Non-student server accounts -> Remove account** to delete the Linux account and its home directory.
+2. If the account was created through the panel, use **Admin accounts -> Non-student server accounts -> Remove account** to delete the Linux account and its home directory.
 3. Delete any temporary student/VAPT student accounts using the normal student removal flow.
 4. Remove any legacy `5cs045-panel` group membership left by an older deployment.
 
