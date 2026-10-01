@@ -91,3 +91,8 @@ The panel now has two roles. The `fullstack` account is the only superadmin; exp
 The **Security** page is a superadmin-only management surface for panel roles and non-student server accounts. Creating a non-student account shows its generated password once, and the account can optionally receive the admin role. These accounts are normal Linux users rather than student accounts.
 
 The visual distinction is intentionally textual rather than colour-only: the restricted state says, "You need super admin access to interact with [tab name]." The generated-password state reuses the existing secret/password presentation so credentials remain prominent without introducing a new visual language.
+
+
+## Admin accounts page
+
+**Admin accounts** is a separate superadmin-only tab rather than part of Security. It owns the lifecycle of non-student server accounts and panel roles: create an account, optionally grant the admin role, show the generated password once, revoke access, and remove panel-managed accounts. If an email is supplied for a newly created admin, the account credentials are emailed as well.
