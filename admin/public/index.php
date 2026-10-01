@@ -246,12 +246,35 @@ try {
         render('security', ['title' => 'Security', 'nav' => 'security', 'bans' => api('bans'),
             'allow' => api('allowlist'), 'settings' => api('settings'),
             'admin_users' => api('admin-users'),
+            'panel_accounts' => api('panel-accounts'),
+            'secret' => take_secret(),
             'signins' => array_slice(api('logs', ['log' => 'admin', 'lines' => 500, 'filter' => 'sign']), 0, 12)]);
     }
 
-    if (preg_match('#^/security/(admin-grant|admin-revoke|unban|allowlist|test-email)$#', $path, $m) && $post) {
+    if (preg_match('#^/security/(admin-grant|admin-revoke|create-panel-account|delete-panel-account|unban|allowlist|test-email)$#', $path, $m) && $post) {
         try {
             switch ($m[1]) {
+                case 'create-panel-account':
+                    $args = [
+                        'username' => trim((string) ($_POST['username'] ?? '')),
+                        'full_name' => trim((string) ($_POST['full_name'] ?? '')),
+                        'email' => trim((string) ($_POST['email'] ?? '')),
+                        'grant_admin' => !empty($_POST['grant_admin']),
+                    ];
+                    $r = api('create-panel-account', $args);
+                    keep_secret([
+                        'kind' => 'panel-account',
+                        'username' => $r['username'],
+                        'password' => $r['password'],
+                        'admin' => $r['admin'],
+                        'email' => $r['email'],
+                    ]);
+                    flash('success', "{$r['username']} was created as a non-student server account.");
+                    break;
+                case 'delete-panel-account':
+                    api('delete-panel-account', ['username' => trim((string) ($_POST['username'] ?? ''))]);
+                    flash('success', 'The non-student server account was removed.');
+                    break;
                 case 'admin-grant':
                     api('admin-grant', ['username' => trim((string) ($_POST['username'] ?? ''))]);
                     flash('success', 'Admin access granted.');
