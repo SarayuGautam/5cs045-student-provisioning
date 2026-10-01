@@ -81,7 +81,7 @@ That adds the computer you are connected from. You can also:
 
 | Role | Access |
 |---|---|
-| `fullstack` / superadmin | Students, Server, Semester, Security, Logs, and admin/account management |
+| `fullstack` / superadmin | Students, Server, Semester, Security, Admin accounts, and Logs |
 | `admin` | Students and Server only |
 | student | No admin panel access |
 
@@ -89,7 +89,7 @@ An admin who opens Semester, Security, or Logs sees a clear message that super a
 
 **Creating a non-student server account**
 
-Only the `fullstack` superadmin can create or remove non-student server accounts from **Security**. A created account is a normal Linux account with a home directory and Bash, but it is not a student: it gets no student website folders, student database, student quota, or sudo.
+Only the `fullstack` superadmin can create or remove non-student server accounts from **Admin accounts**. A created account is a normal Linux account with a home directory and Bash, but it is not a student: it gets no student website folders, student database, student quota, or sudo.
 
 The form can also grant the **admin** panel role at creation time. When an email address is provided for a new admin, the panel sends the generated username, password, role, and admin-panel URL to that email. The generated password is also shown once in the panel.
 
@@ -123,7 +123,7 @@ sudo ./setup/update-server.sh
 
 A plain `git pull` does **not** update the live copy under `/var/www/5cs045-admin` or `/usr/local/sbin/5cs045/bin`.
 
-When moving an older server to the role system, the `5cs045-panel` group is legacy. It is no longer enough to grant panel access. Use **Security → Panel administrators** to grant the admin role explicitly.
+When moving an older server to the role system, the `5cs045-panel` group is legacy. It is no longer enough to grant panel access. Use **Admin accounts → Panel administrators** to grant the admin role explicitly.
 
 ## First-time setup
 
