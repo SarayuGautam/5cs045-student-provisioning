@@ -9,9 +9,9 @@ declare(strict_types=1);
 //   {"action": "...", "token": "...", "ip": "...", "args": {...}}
 // and the answer goes out as JSON on stdout: {"ok": true, "data": ...} or {"ok": false, "error": "..."}.
 //
-// Everything except "login" needs a token, which only "login" hands out, and only for an
-// account in the sudo group whose password checks out. So even someone who took over the
-// panel's own user could not do anything here without an admin's password.
+// Everything except "login" needs a token, which only "login" hands out after checking
+// a fullstack or explicitly granted panel-admin account's password and role. The panel's
+// own unprivileged user never receives the authority to choose a root action.
 //
 // Background jobs (smoke test, bulk add, remove everyone) run as:  admin-action --job <id>
 
