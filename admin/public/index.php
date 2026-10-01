@@ -32,6 +32,7 @@ if ($path === '/login') {
             session_regenerate_id(true);
             $_SESSION['token'] = $data['token'];
             $_SESSION['user'] = $data['user'];
+            $_SESSION['role'] = (string) ($data['role'] ?? '');
             $next = (string) ($_SESSION['after_login'] ?? '/');
             unset($_SESSION['after_login']);
             redirect(preg_match('#^/[a-z0-9/_-]*$#', $next) ? $next : '/');
@@ -51,6 +52,35 @@ if (!signed_in()) {
         json_out(['signed_out' => true]);
     }
     redirect('/login');
+}
+
+// Refresh role from root-owned auth state on every request, so revocation takes effect promptly.
+$identity = api('ping');
+$_SESSION['role'] = (string) ($identity['role'] ?? '');
+
+if ($_SESSION['role'] === 'admin') {
+    $restrictedTab = null;
+    $restrictedNav = '';
+
+    if (preg_match('#^/semester(?:/|$)#', $path) || preg_match('#^/jobs(?:/|$)#', $path)) {
+        $restrictedTab = 'Semester';
+        $restrictedNav = 'semester';
+    } elseif (preg_match('#^/security(?:/|$)#', $path)) {
+        $restrictedTab = 'Security';
+        $restrictedNav = 'security';
+    } elseif ($path === '/logs') {
+        $restrictedTab = 'Logs';
+        $restrictedNav = 'logs';
+    }
+
+    if ($restrictedTab !== null) {
+        http_response_code(403);
+        render('access-denied', [
+            'title' => $restrictedTab,
+            'nav' => $restrictedNav,
+            'tab' => $restrictedTab,
+        ]);
+    }
 }
 
 if ($path === '/logout' && $post) {
@@ -215,12 +245,21 @@ try {
     if ($path === '/security' && !$post) {
         render('security', ['title' => 'Security', 'nav' => 'security', 'bans' => api('bans'),
             'allow' => api('allowlist'), 'settings' => api('settings'),
+            'admin_users' => api('admin-users'),
             'signins' => array_slice(api('logs', ['log' => 'admin', 'lines' => 500, 'filter' => 'sign']), 0, 12)]);
     }
 
-    if (preg_match('#^/security/(unban|allowlist|test-email)$#', $path, $m) && $post) {
+    if (preg_match('#^/security/(admin-grant|admin-revoke|unban|allowlist|test-email)$#', $path, $m) && $post) {
         try {
             switch ($m[1]) {
+                case 'admin-grant':
+                    api('admin-grant', ['username' => trim((string) ($_POST['username'] ?? ''))]);
+                    flash('success', 'Admin access granted.');
+                    break;
+                case 'admin-revoke':
+                    api('admin-revoke', ['username' => trim((string) ($_POST['username'] ?? ''))]);
+                    flash('success', 'Admin access removed.');
+                    break;
                 case 'unban':
                     $r = api('unban', ['jail' => (string) ($_POST['jail'] ?? ''), 'address' => (string) ($_POST['address'] ?? '')]);
                     flash('success', "{$r['address']} is unblocked and can try again.");
