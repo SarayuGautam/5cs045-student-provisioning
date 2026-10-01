@@ -32,78 +32,144 @@ const DB_OVER_DIR = '/var/lib/5cs045-db-over';
 const QUOTA_OVERRIDE_DIR = '/var/lib/5cs045-quota-overrides';
 const DEFAULT_QUOTA_MB = 500;
 const DB_LIMIT_MB = 100;
-const IDLE_TIMEOUT = 1800;       // signed out after 30 minutes without activity
-const MAX_SESSION = 12 * 3600;   // and after 12 hours in any case
-const MAX_FAILS = 5;             // wrong passwords allowed per 15 minutes, per account and per address
+const IDLE_TIMEOUT = 1800;
+const MAX_SESSION = 12 * 3600;
+const MAX_FAILS = 5;
 const FAIL_WINDOW = 900;
 const USERNAME_RE = '/^[a-z][a-z0-9_]{2,31}$/';
+
 const LOGS = [
     'registration' => '/var/log/5cs045-registration.log',
     'provisioning' => '/var/log/5cs045-provisioning.log',
     'admin' => ADMIN_LOG,
 ];
-const SERVICES = ['nginx', 'php8.3-fpm', 'mariadb', 'ssh', 'fail2ban', 'cron', 'systemd-logind'];
+
+const SERVICES = [
+    'nginx',
+    'php8.3-fpm',
+    'mariadb',
+    'ssh',
+    'fail2ban',
+    'cron',
+    'systemd-logind'
+];
 
 // ---------------------------------------------------------------------------------------------
 // Plumbing
 
 function reply(mixed $data): never {
-    echo json_encode(['ok' => true, 'data' => $data], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    echo json_encode(
+        ['ok' => true, 'data' => $data],
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+    );
     exit(0);
 }
 
 function refuse(string $message): never {
-    echo json_encode(['ok' => false, 'error' => $message], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    echo json_encode(
+        ['ok' => false, 'error' => $message],
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+    );
     exit(0);
 }
 
 /** Runs a command without a shell. Returns [exit code, stdout, stderr]. */
 function run(array $cmd, ?string $stdin = null): array {
-    $proc = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+    $proc = proc_open(
+        $cmd,
+        [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ],
+        $pipes
+    );
+
     if (!is_resource($proc)) {
         return [127, '', 'could not start ' . $cmd[0]];
     }
+
     if ($stdin !== null) {
         fwrite($pipes[0], $stdin);
     }
+
     fclose($pipes[0]);
+
     $out = stream_get_contents($pipes[1]);
     $err = stream_get_contents($pipes[2]);
+
     fclose($pipes[1]);
     fclose($pipes[2]);
-    return [proc_close($proc), (string) $out, (string) $err];
+
+    return [
+        proc_close($proc),
+        (string) $out,
+        (string) $err
+    ];
 }
 
 function audit(string $who, string $ip, string $what): void {
-    $line = sprintf("[%s] [%s] %s: %s\n", date('c'), $ip, $who, $what);
-    @file_put_contents(ADMIN_LOG, $line, FILE_APPEND | LOCK_EX);
+    $line = sprintf(
+        "[%s] [%s] %s: %s\n",
+        date('c'),
+        $ip,
+        $who,
+        $what
+    );
+
+    @file_put_contents(
+        ADMIN_LOG,
+        $line,
+        FILE_APPEND | LOCK_EX
+    );
+
     @chmod(ADMIN_LOG, 0600);
 }
 
 function arg(array $args, string $name, string $default = ''): string {
     $v = $args[$name] ?? $default;
-    return is_scalar($v) ? trim((string) $v) : $default;
+
+    return is_scalar($v)
+        ? trim((string) $v)
+        : $default;
 }
 
 function student_or_refuse(string $user): string {
     if (!preg_match(USERNAME_RE, $user)) {
         refuse('That is not a valid username.');
     }
+
     $pw = posix_getpwnam($user);
-    if ($pw === false || !str_starts_with((string) $pw['dir'], STUDENT_ROOT . '/')) {
+
+    if (
+        $pw === false ||
+        !str_starts_with(
+            (string) $pw['dir'],
+            STUDENT_ROOT . '/'
+        )
+    ) {
         refuse("There is no student called {$user}.");
     }
+
     return $user;
 }
 
 function smtp(): array {
     $c = @include SMTP_CONFIG;
+
     return is_array($c) ? $c : [];
 }
 
-function send_mail(string $to, string $subject, string $body): ?string {
+function send_mail(
+    string $to,
+    string $subject,
+    string $body,
+    ?string $htmlBody = null
+): ?string {
     require_once WEB_LIB . '/smtp_mailer.php';
+
     $c = smtp();
+
     try {
         $mailer = new SmtpMailer(
             host: (string) ($c['host'] ?? ''),
@@ -111,145 +177,415 @@ function send_mail(string $to, string $subject, string $body): ?string {
             username: (string) ($c['username'] ?? ''),
             password: (string) ($c['password'] ?? ''),
             fromAddress: (string) ($c['from_address'] ?? ''),
-            fromName: (string) ($c['from_name'] ?? '5CS045 Student Server'),
-            useStartTls: (bool) ($c['use_starttls'] ?? true),
+            fromName: (string) (
+                $c['from_name'] ?? '5CS045 Student Server'
+            ),
+            useStartTls: (bool) (
+                $c['use_starttls'] ?? true
+            ),
         );
-        $mailer->send($to, $subject, $body);
+
+        $mailer->send(
+            $to,
+            $subject,
+            $body,
+            $htmlBody
+        );
+
         return null;
     } catch (Throwable $e) {
         return $e->getMessage();
     }
 }
 
-function send_credentials(string $user, string $email): ?string {
+function send_credentials(
+    string $user,
+    string $email
+): ?string {
     require_once WEB_LIB . '/credentials.php';
+
     $password = saved_password($user);
+
     if ($password === null) {
         return 'No saved password for this student. Reset the password first.';
     }
-    return send_mail($email, 'Your Server Credentials', credentials_email_body($user, $password, site_url()));
+
+    $serverUrl = site_url();
+
+    return send_mail(
+        $email,
+        'Your Server Credentials',
+        credentials_email_body(
+            $user,
+            $password,
+            $serverUrl
+        ),
+        credentials_email_html(
+            $user,
+            $password,
+            $serverUrl
+        )
+    );
 }
 
 /** The students' websites, as the login emails give them: their name, never an IP address. */
 function site_url(): string {
     require_once WEB_LIB . '/credentials.php';
+
     return student_site_url(smtp());
 }
 
 function saved_password(string $user): ?string {
-    $raw = @file_get_contents(CRED_DIR . '/' . $user);
-    return ($raw !== false && preg_match('/^PASSWORD=(\S+)/m', $raw, $m)) ? $m[1] : null;
+    $raw = @file_get_contents(
+        CRED_DIR . '/' . $user
+    );
+
+    return (
+        $raw !== false &&
+        preg_match('/^PASSWORD=(\S+)/m', $raw, $m)
+    ) ? $m[1] : null;
 }
 
 function valid_email(string $email): bool {
-    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false && !preg_match('/["\\\\\s]/', $email);
+    return (
+        filter_var(
+            $email,
+            FILTER_VALIDATE_EMAIL
+        ) !== false &&
+        !preg_match(
+            '/["\\\\\s]/',
+            $email
+        )
+    );
 }
 
 /** Remembers a student's email next to their registration, so the panel can show and reuse it. */
-function remember_email(string $user, string $email): void {
+function remember_email(
+    string $user,
+    string $email
+): void {
     require_once WEB_LIB . '/credentials.php';
-    @mkdir(REGISTRY_DIR, 0700, true);
-    $path = REGISTRY_DIR . '/' . registration_key($email);
-    $record = is_file($path) ? (json_decode((string) file_get_contents($path), true) ?: []) : [];
-    $record += ['username' => $user, 'registered_at' => date(DATE_ATOM), 'status' => 'complete'];
+
+    @mkdir(
+        REGISTRY_DIR,
+        0700,
+        true
+    );
+
+    $path =
+        REGISTRY_DIR . '/' .
+        registration_key($email);
+
+    $record = is_file($path)
+        ? (
+            json_decode(
+                (string) file_get_contents($path),
+                true
+            ) ?: []
+        )
+        : [];
+
+    $record += [
+        'username' => $user,
+        'registered_at' => date(DATE_ATOM),
+        'status' => 'complete'
+    ];
+
     $record['email'] = strtolower($email);
-    file_put_contents($path, json_encode($record, JSON_UNESCAPED_SLASHES), LOCK_EX);
+
+    file_put_contents(
+        $path,
+        json_encode(
+            $record,
+            JSON_UNESCAPED_SLASHES
+        ),
+        LOCK_EX
+    );
+
     chmod($path, 0600);
+
     @chown($path, 'www-data');
     @chgrp($path, 'www-data');
 }
 
 /** PHP reloads after the answer has gone back, because a reload ends the request that asked for it. */
 function reload_later(): void {
-    $script = 'systemctl daemon-reload; systemctl reload php8.3-fpm';
+    $script =
+        'systemctl daemon-reload; systemctl reload php8.3-fpm';
+
     if (is_dir('/run/systemd/system')) {
-        run(['systemd-run', '--quiet', '--collect', '--on-active=5s', '/bin/sh', '-c', $script]);
+        run([
+            'systemd-run',
+            '--quiet',
+            '--collect',
+            '--on-active=5s',
+            '/bin/sh',
+            '-c',
+            $script
+        ]);
     }
 }
 
 // ---------------------------------------------------------------------------------------------
 // Signing in
 
-function fail_file(string $kind, string $key): string {
-    return AUTH_DIR . '/fails-' . $kind . '-' . hash('sha256', $key);
+function fail_file(
+    string $kind,
+    string $key
+): string {
+    return AUTH_DIR .
+        '/fails-' .
+        $kind .
+        '-' .
+        hash('sha256', $key);
 }
 
 function recent_fails(string $file): array {
     $now = time();
-    $times = array_filter(array_map('intval', @file($file, FILE_IGNORE_NEW_LINES) ?: []),
-        fn($t) => $now - $t < FAIL_WINDOW);
+
+    $times = array_filter(
+        array_map(
+            'intval',
+            @file(
+                $file,
+                FILE_IGNORE_NEW_LINES
+            ) ?: []
+        ),
+        fn($t) => $now - $t < FAIL_WINDOW
+    );
+
     return array_values($times);
 }
 
-function do_login(array $args, string $ip): never {
+function do_login(
+    array $args,
+    string $ip
+): never {
     $user = arg($args, 'username');
-    $password = (string) ($args['password'] ?? '');
-    @mkdir(AUTH_DIR . '/sessions', 0700, true);
+    $password = (string) (
+        $args['password'] ?? ''
+    );
 
-    $files = [fail_file('user', $user), fail_file('ip', $ip)];
+    @mkdir(
+        AUTH_DIR . '/sessions',
+        0700,
+        true
+    );
+
+    $files = [
+        fail_file('user', $user),
+        fail_file('ip', $ip)
+    ];
+
     foreach ($files as $f) {
         $fails = recent_fails($f);
+
         if (count($fails) >= MAX_FAILS) {
-            $wait = (int) ceil((FAIL_WINDOW - (time() - min($fails))) / 60);
-            refuse("Too many wrong passwords. Try again in {$wait} minute" . ($wait === 1 ? '' : 's') . '.');
+            $wait = (int) ceil(
+                (
+                    FAIL_WINDOW -
+                    (time() - min($fails))
+                ) / 60
+            );
+
+            refuse(
+                "Too many wrong passwords. Try again in {$wait} minute" .
+                ($wait === 1 ? '' : 's') .
+                '.'
+            );
         }
     }
 
     $ok = false;
-    $pw = preg_match('/^[a-z_][a-z0-9_-]{0,31}$/', $user) ? posix_getpwnam($user) : false;
-    if ($pw !== false && $pw['uid'] >= 1000 && !str_starts_with((string) $pw['dir'], STUDENT_ROOT . '/')) {
-        [, $groups] = run(['id', '-nG', $user]);
-        $groups = preg_split('/\s+/', trim($groups));
-        [, $shadow] = run(['getent', 'shadow', $user]);
-        $hash = explode(':', trim($shadow))[1] ?? '';
-        // sudo/admin accounts are the usual admins; 5cs045-panel is for accounts that should be
-        // able to use the panel but have no sudo on the server (for example VAPT testers).
-        if (array_intersect(['sudo', 'admin', '5cs045-panel'], $groups) && !in_array('5cs045-students', $groups, true)
-            && $hash !== '' && !in_array($hash[0], ['!', '*'], true)) {
-            // PHP's own crypt() cannot check yescrypt (Ubuntu's default), the system's crypt() can.
-            [, $match] = run(['perl', '-e',
-                'chomp(my $p = <STDIN>); chomp(my $h = <STDIN>); print((crypt($p, $h) // "") eq $h ? "yes" : "no");'],
-                $password . "\n" . $hash . "\n");
+
+    $pw =
+        preg_match(
+            '/^[a-z_][a-z0-9_-]{0,31}$/',
+            $user
+        )
+        ? posix_getpwnam($user)
+        : false;
+
+    if (
+        $pw !== false &&
+        $pw['uid'] >= 1000 &&
+        !str_starts_with(
+            (string) $pw['dir'],
+            STUDENT_ROOT . '/'
+        )
+    ) {
+        [, $groups] = run([
+            'id',
+            '-nG',
+            $user
+        ]);
+
+        $groups = preg_split(
+            '/\s+/',
+            trim($groups)
+        );
+
+        [, $shadow] = run([
+            'getent',
+            'shadow',
+            $user
+        ]);
+
+        $hash =
+            explode(
+                ':',
+                trim($shadow)
+            )[1] ?? '';
+
+        if (
+            array_intersect(
+                [
+                    'sudo',
+                    'admin',
+                    '5cs045-panel'
+                ],
+                $groups
+            ) &&
+            !in_array(
+                '5cs045-students',
+                $groups,
+                true
+            ) &&
+            $hash !== '' &&
+            !in_array(
+                $hash[0],
+                ['!', '*'],
+                true
+            )
+        ) {
+            [, $match] = run(
+                [
+                    'perl',
+                    '-e',
+                    'chomp(my $p = <STDIN>); chomp(my $h = <STDIN>); print((crypt($p, $h) // "") eq $h ? "yes" : "no");'
+                ],
+                $password .
+                "\n" .
+                $hash .
+                "\n"
+            );
+
             $ok = $match === 'yes';
         }
     }
 
     if (!$ok) {
         foreach ($files as $f) {
-            file_put_contents($f, time() . "\n", FILE_APPEND | LOCK_EX);
+            file_put_contents(
+                $f,
+                time() . "\n",
+                FILE_APPEND | LOCK_EX
+            );
         }
-        audit($user !== '' ? $user : '?', $ip, 'FAILED sign-in');
-        refuse('Wrong username or password, or this account cannot manage the server.');
+
+        audit(
+            $user !== '' ? $user : '?',
+            $ip,
+            'FAILED sign-in'
+        );
+
+        refuse(
+            'Wrong username or password, or this account cannot manage the server.'
+        );
     }
 
     foreach ($files as $f) {
         @unlink($f);
     }
-    $token = bin2hex(random_bytes(32));
-    $session = ['user' => $user, 'ip' => $ip, 'created' => time(), 'seen' => time()];
-    file_put_contents(AUTH_DIR . '/sessions/' . hash('sha256', $token), json_encode($session));
-    audit($user, $ip, 'signed in');
-    reply(['token' => $token, 'user' => $user]);
+
+    $token = bin2hex(
+        random_bytes(32)
+    );
+
+    $session = [
+        'user' => $user,
+        'ip' => $ip,
+        'created' => time(),
+        'seen' => time()
+    ];
+
+    file_put_contents(
+        AUTH_DIR .
+        '/sessions/' .
+        hash('sha256', $token),
+        json_encode($session)
+    );
+
+    audit(
+        $user,
+        $ip,
+        'signed in'
+    );
+
+    reply([
+        'token' => $token,
+        'user' => $user
+    ]);
 }
 
-function check_token(string $token, string $ip): string {
-    $file = AUTH_DIR . '/sessions/' . hash('sha256', $token);
-    $s = preg_match('/^[a-f0-9]{64}$/', $token) && is_file($file) ? json_decode((string) file_get_contents($file), true) : null;
+function check_token(
+    string $token,
+    string $ip
+): string {
+    $file =
+        AUTH_DIR .
+        '/sessions/' .
+        hash('sha256', $token);
+
+    $s =
+        preg_match(
+            '/^[a-f0-9]{64}$/',
+            $token
+        ) &&
+        is_file($file)
+            ? json_decode(
+                (string) file_get_contents($file),
+                true
+            )
+            : null;
+
     $now = time();
-    if (!is_array($s) || ($s['ip'] ?? '') !== $ip || $now - (int) $s['seen'] > IDLE_TIMEOUT || $now - (int) $s['created'] > MAX_SESSION) {
+
+    if (
+        !is_array($s) ||
+        ($s['ip'] ?? '') !== $ip ||
+        $now - (int) $s['seen'] > IDLE_TIMEOUT ||
+        $now - (int) $s['created'] > MAX_SESSION
+    ) {
         if (is_file($file)) {
             unlink($file);
         }
+
         refuse('SESSION_EXPIRED');
     }
+
     $s['seen'] = $now;
-    file_put_contents($file, json_encode($s));
-    // Tidy up sessions nobody signed out of
-    foreach (glob(AUTH_DIR . '/sessions/*') ?: [] as $old) {
-        if ($now - filemtime($old) > MAX_SESSION) {
+
+    file_put_contents(
+        $file,
+        json_encode($s)
+    );
+
+    foreach (
+        glob(
+            AUTH_DIR . '/sessions/*'
+        ) ?: []
+        as $old
+    ) {
+        if (
+            $now -
+            filemtime($old) >
+            MAX_SESSION
+        ) {
             @unlink($old);
         }
     }
+
     return (string) $s['user'];
 }
 
@@ -257,116 +593,366 @@ function check_token(string $token, string $ip): string {
 // Reading the server
 
 function quota_mount(): string {
-    [, $out] = run(['df', '--output=target', STUDENT_ROOT]);
-    $lines = array_values(array_filter(explode("\n", trim($out))));
+    [, $out] = run([
+        'df',
+        '--output=target',
+        STUDENT_ROOT
+    ]);
+
+    $lines = array_values(
+        array_filter(
+            explode(
+                "\n",
+                trim($out)
+            )
+        )
+    );
+
     return end($lines) ?: '/';
 }
 
 function quotas_on(): bool {
-    [, $out] = run(['quotaon', '-pu', quota_mount()]);
-    return str_contains($out, ' is on');
+    [, $out] = run([
+        'quotaon',
+        '-pu',
+        quota_mount()
+    ]);
+
+    return str_contains(
+        $out,
+        ' is on'
+    );
 }
 
 /** username => [used_kb, limit_kb], from one repquota call. */
 function quota_map(): array {
-    [$code, $out] = run(['repquota', '-u', '-O', 'csv', quota_mount()]);
+    [
+        $code,
+        $out
+    ] = run([
+        'repquota',
+        '-u',
+        '-O',
+        'csv',
+        quota_mount()
+    ]);
+
     if ($code !== 0) {
         return [];
     }
-    $lines = array_values(array_filter(explode("\n", trim($out))));
-    $head = str_getcsv(array_shift($lines) ?? '');
+
+    $lines = array_values(
+        array_filter(
+            explode(
+                "\n",
+                trim($out)
+            )
+        )
+    );
+
+    $head = str_getcsv(
+        array_shift($lines) ?? ''
+    );
+
     $used = $hard = null;
+
     foreach ($head as $i => $h) {
-        if ($used === null && str_ends_with($h, 'Used') && !str_starts_with($h, 'File')) $used = $i;
-        if ($hard === null && str_ends_with($h, 'HardLimit') && !str_starts_with($h, 'File')) $hard = $i;
-    }
-    $map = [];
-    foreach ($lines as $line) {
-        $row = str_getcsv($line);
-        if ($used !== null && $hard !== null && isset($row[$hard])) {
-            $map[$row[0]] = [(int) $row[$used], (int) $row[$hard]];
+        if (
+            $used === null &&
+            str_ends_with(
+                $h,
+                'Used'
+            ) &&
+            !str_starts_with(
+                $h,
+                'File'
+            )
+        ) {
+            $used = $i;
+        }
+
+        if (
+            $hard === null &&
+            str_ends_with(
+                $h,
+                'HardLimit'
+            ) &&
+            !str_starts_with(
+                $h,
+                'File'
+            )
+        ) {
+            $hard = $i;
         }
     }
+
+    $map = [];
+
+    foreach ($lines as $line) {
+        $row = str_getcsv($line);
+
+        if (
+            $used !== null &&
+            $hard !== null &&
+            isset($row[$hard])
+        ) {
+            $map[$row[0]] = [
+                (int) $row[$used],
+                (int) $row[$hard]
+            ];
+        }
+    }
+
     return $map;
 }
 
 function mysql_datadir(): string {
-    [, $out] = run(['mysql', '-N', '-B', '-e', 'SELECT @@datadir']);
-    return rtrim(trim($out), '/');
+    [
+        ,
+        $out
+    ] = run([
+        'mysql',
+        '-N',
+        '-B',
+        '-e',
+        'SELECT @@datadir'
+    ]);
+
+    return rtrim(
+        trim($out),
+        '/'
+    );
 }
 
 /** username => MB, from one du call over every student database folder. */
 function db_sizes(array $users): array {
     $dir = mysql_datadir();
-    $paths = array_values(array_filter(array_map(fn($u) => "{$dir}/{$u}", $users), 'is_dir'));
-    if ($dir === '' || !$paths) {
+
+    $paths = array_values(
+        array_filter(
+            array_map(
+                fn($u) => "{$dir}/{$u}",
+                $users
+            ),
+            'is_dir'
+        )
+    );
+
+    if (
+        $dir === '' ||
+        !$paths
+    ) {
         return [];
     }
-    [, $out] = run(array_merge(['du', '-sk'], $paths));
+
+    [
+        ,
+        $out
+    ] = run(
+        array_merge(
+            ['du', '-sk'],
+            $paths
+        )
+    );
+
     $map = [];
-    foreach (explode("\n", trim($out)) as $line) {
-        [$kb, $path] = array_pad(preg_split('/\s+/', $line, 2), 2, '');
-        $map[basename($path)] = round(((int) $kb) / 1024, 1);
+
+    foreach (
+        explode(
+            "\n",
+            trim($out)
+        ) as $line
+    ) {
+        [
+            $kb,
+            $path
+        ] = array_pad(
+            preg_split(
+                '/\s+/',
+                $line,
+                2
+            ),
+            2,
+            ''
+        );
+
+        $map[
+            basename($path)
+        ] = round(
+            ((int) $kb) / 1024,
+            1
+        );
     }
+
     return $map;
 }
 
 function last_logins(): array {
-    [, $out] = run(['lastlog']);
+    [
+        ,
+        $out
+    ] = run(['lastlog']);
+
     $map = [];
-    foreach (array_slice(explode("\n", $out), 1) as $line) {
-        $name = strtok($line, ' ');
-        if ($name && !str_contains($line, 'Never logged in')
-            && preg_match('/(\w{3} \w{3} +\d+ [\d:]+ [+-]\d{4} \d{4})\s*$/', $line, $m)) {
-            $map[$name] = strtotime($m[1]) ?: null;
+
+    foreach (
+        array_slice(
+            explode("\n", $out),
+            1
+        ) as $line
+    ) {
+        $name = strtok(
+            $line,
+            ' '
+        );
+
+        if (
+            $name &&
+            !str_contains(
+                $line,
+                'Never logged in'
+            ) &&
+            preg_match(
+                '/(\w{3} \w{3} +\d+ [\d:]+ [+-]\d{4} \d{4})\s*$/',
+                $line,
+                $m
+            )
+        ) {
+            $map[$name] =
+                strtotime($m[1]) ?: null;
         }
     }
+
     return $map;
 }
 
 function online_users(): array {
-    [, $out] = run(['who']);
+    [
+        ,
+        $out
+    ] = run(['who']);
+
     $names = [];
-    foreach (explode("\n", trim($out)) as $line) {
-        if ($line !== '') $names[strtok($line, ' ')] = true;
+
+    foreach (
+        explode(
+            "\n",
+            trim($out)
+        ) as $line
+    ) {
+        if ($line !== '') {
+            $names[
+                strtok(
+                    $line,
+                    ' '
+                )
+            ] = true;
+        }
     }
+
     return $names;
 }
 
 function registry_records(): array {
     $map = [];
-    foreach (glob(REGISTRY_DIR . '/*') ?: [] as $file) {
-        $r = json_decode((string) @file_get_contents($file), true);
-        if (is_array($r) && isset($r['username'])) {
+
+    foreach (
+        glob(
+            REGISTRY_DIR . '/*'
+        ) ?: [] as $file
+    ) {
+        $r = json_decode(
+            (string) @file_get_contents($file),
+            true
+        );
+
+        if (
+            is_array($r) &&
+            isset($r['username'])
+        ) {
             $map[$r['username']] = $r;
         }
     }
+
     return $map;
 }
 
 function student_names(): array {
     $users = [];
-    [, $out] = run(['getent', 'passwd']);
-    foreach (explode("\n", trim($out)) as $line) {
-        $f = explode(':', $line);
-        if (count($f) >= 7 && str_starts_with($f[5], STUDENT_ROOT . '/') && preg_match(USERNAME_RE, $f[0])) {
-            $users[$f[0]] = ['uid' => (int) $f[2], 'full_name' => explode(',', $f[4])[0]];
+
+    [
+        ,
+        $out
+    ] = run(['getent', 'passwd']);
+
+    foreach (
+        explode(
+            "\n",
+            trim($out)
+        ) as $line
+    ) {
+        $f = explode(
+            ':',
+            $line
+        );
+
+        if (
+            count($f) >= 7 &&
+            str_starts_with(
+                $f[5],
+                STUDENT_ROOT . '/'
+            ) &&
+            preg_match(
+                USERNAME_RE,
+                $f[0]
+            )
+        ) {
+            $users[$f[0]] = [
+                'uid' => (int) $f[2],
+                'full_name' => explode(
+                    ',',
+                    $f[4]
+                )[0]
+            ];
         }
     }
+
     ksort($users);
+
     return $users;
 }
 
-/** The name given when the account was made, or else one read from the email (sarayu.gautam@... -> Sarayu Gautam). */
-function display_name(string $gecos, ?string $email): string {
-    if ($gecos !== '' && $gecos !== '5CS045 student') {
+/** The name given when the account was made, or else one read from the email. */
+function display_name(
+    string $gecos,
+    ?string $email
+): string {
+    if (
+        $gecos !== '' &&
+        $gecos !== '5CS045 student'
+    ) {
         return $gecos;
     }
+
     if ($email === null) {
         return '';
     }
-    $local = preg_replace('/[^a-z]+/', ' ', strtolower(strstr($email, '@', true) ?: ''));
-    return ucwords(trim((string) $local));
+
+    $local = preg_replace(
+        '/[^a-z]+/',
+        ' ',
+        strtolower(
+            strstr(
+                $email,
+                '@',
+                true
+            ) ?: ''
+        )
+    );
+
+    return ucwords(
+        trim((string) $local)
+    );
 }
 
 function students_list(): array {
@@ -377,30 +963,86 @@ function students_list(): array {
     $last = last_logins();
     $online = online_users();
     $reg = registry_records();
+
     $rows = [];
-    foreach ($users as $name => $u) {
-        $home = STUDENT_ROOT . '/' . $name;
+
+    foreach (
+        $users as $name => $u
+    ) {
+        $home =
+            STUDENT_ROOT .
+            '/' .
+            $name;
+
         $rows[] = [
             'username' => $name,
-            'full_name' => display_name($u['full_name'], $reg[$name]['email'] ?? null),
-            'email' => $reg[$name]['email'] ?? null,
-            'registered_at' => $reg[$name]['registered_at'] ?? (($t = @filectime($home)) ? date(DATE_ATOM, $t) : null),
-            'disk_used_mb' => isset($quota[$name]) ? round($quota[$name][0] / 1024, 1) : null,
-            'disk_limit_mb' => isset($quota[$name]) && $quota[$name][1] > 0 ? (int) round($quota[$name][1] / 1024) : null,
-            'db_mb' => $db[$name] ?? 0.0,
-            'db_locked' => is_file(DB_OVER_DIR . '/' . $name),
-            'last_login' => isset($last[$name]) ? date(DATE_ATOM, $last[$name]) : null,
-            'online' => isset($online[$name]),
+            'full_name' => display_name(
+                $u['full_name'],
+                $reg[$name]['email'] ?? null
+            ),
+            'email' =>
+                $reg[$name]['email'] ?? null,
+            'registered_at' =>
+                $reg[$name]['registered_at'] ??
+                (
+                    ($t = @filectime($home))
+                        ? date(DATE_ATOM, $t)
+                        : null
+                ),
+            'disk_used_mb' =>
+                isset($quota[$name])
+                    ? round(
+                        $quota[$name][0] / 1024,
+                        1
+                    )
+                    : null,
+            'disk_limit_mb' =>
+                isset($quota[$name]) &&
+                $quota[$name][1] > 0
+                    ? (int) round(
+                        $quota[$name][1] / 1024
+                    )
+                    : null,
+            'db_mb' =>
+                $db[$name] ?? 0.0,
+            'db_locked' =>
+                is_file(
+                    DB_OVER_DIR . '/' . $name
+                ),
+            'last_login' =>
+                isset($last[$name])
+                    ? date(
+                        DATE_ATOM,
+                        $last[$name]
+                    )
+                    : null,
+            'online' =>
+                isset($online[$name]),
         ];
     }
+
     return $rows;
 }
 
 function meminfo(): array {
     $m = [];
-    foreach (file('/proc/meminfo') ?: [] as $line) {
-        if (preg_match('/^(\w+):\s+(\d+)/', $line, $x)) $m[$x[1]] = (int) $x[2];
+
+    foreach (
+        file('/proc/meminfo') ?: []
+        as $line
+    ) {
+        if (
+            preg_match(
+                '/^(\w+):\s+(\d+)/',
+                $line,
+                $x
+            )
+        ) {
+            $m[$x[1]] =
+                (int) $x[2];
+        }
     }
+
     return $m;
 }
 
@@ -408,60 +1050,274 @@ function health(): array {
     $df = disk_total_space('/') ?: 0;
     $free = disk_free_space('/') ?: 0;
     $m = meminfo();
+
     $services = [];
-    foreach (SERVICES as $svc) {
-        [, $state] = run(['timeout', '5', 'systemctl', 'is-active', $svc]);
-        $services[$svc] = trim($state) ?: 'unknown';
+
+    foreach (
+        SERVICES as $svc
+    ) {
+        [
+            ,
+            $state
+        ] = run([
+            'timeout',
+            '5',
+            'systemctl',
+            'is-active',
+            $svc
+        ]);
+
+        $services[$svc] =
+            trim($state) ?: 'unknown';
     }
-    [$lcode, $lout] = run(['timeout', '5', 'loginctl', 'list-sessions', '--no-legend']);
-    $load = explode(' ', (string) @file_get_contents('/proc/loadavg'));
-    [, $cores] = run(['nproc']);
+
+    [
+        $lcode,
+        $lout
+    ] = run([
+        'timeout',
+        '5',
+        'loginctl',
+        'list-sessions',
+        '--no-legend'
+    ]);
+
+    $load = explode(
+        ' ',
+        (string) @file_get_contents(
+            '/proc/loadavg'
+        )
+    );
+
+    [
+        ,
+        $cores
+    ] = run(['nproc']);
+
     $c = smtp();
+
     $h = [
-        'disk' => ['total' => $df, 'used' => $df - $free, 'percent' => $df ? round(100 * ($df - $free) / $df) : 0],
-        'memory' => ['total' => ($m['MemTotal'] ?? 0) * 1024, 'available' => ($m['MemAvailable'] ?? 0) * 1024,
-                     'percent' => ($m['MemTotal'] ?? 0) ? round(100 * (1 - ($m['MemAvailable'] ?? 0) / $m['MemTotal'])) : 0],
-        'swap' => ['total' => ($m['SwapTotal'] ?? 0) * 1024, 'used' => (($m['SwapTotal'] ?? 0) - ($m['SwapFree'] ?? 0)) * 1024],
-        'load' => (float) ($load[0] ?? 0),
-        'cores' => (int) trim($cores) ?: 1,
-        'uptime' => (int) (float) explode(' ', (string) @file_get_contents('/proc/uptime'))[0],
+        'disk' => [
+            'total' => $df,
+            'used' => $df - $free,
+            'percent' =>
+                $df
+                    ? round(
+                        100 *
+                        ($df - $free) /
+                        $df
+                    )
+                    : 0
+        ],
+        'memory' => [
+            'total' =>
+                ($m['MemTotal'] ?? 0) * 1024,
+            'available' =>
+                ($m['MemAvailable'] ?? 0) * 1024,
+            'percent' =>
+                ($m['MemTotal'] ?? 0)
+                    ? round(
+                        100 *
+                        (
+                            1 -
+                            (
+                                ($m['MemAvailable'] ?? 0) /
+                                $m['MemTotal']
+                            )
+                        )
+                    )
+                    : 0
+        ],
+        'swap' => [
+            'total' =>
+                ($m['SwapTotal'] ?? 0) * 1024,
+            'used' =>
+                (
+                    ($m['SwapTotal'] ?? 0) -
+                    ($m['SwapFree'] ?? 0)
+                ) * 1024
+        ],
+        'load' =>
+            (float) ($load[0] ?? 0),
+        'cores' =>
+            (int) trim($cores) ?: 1,
+        'uptime' =>
+            (int) (
+                floatval(
+                    explode(
+                        ' ',
+                        (string) @file_get_contents(
+                            '/proc/uptime'
+                        )
+                    )[0]
+                )
+            ),
         'services' => $services,
-        'logind_ok' => $lcode === 0,
-        'sessions' => $lcode === 0 ? count(array_filter(explode("\n", trim($lout)))) : null,
+        'logind_ok' =>
+            $lcode === 0,
+        'sessions' =>
+            $lcode === 0
+                ? count(
+                    array_filter(
+                        explode(
+                            "\n",
+                            trim($lout)
+                        )
+                    )
+                )
+                : null,
         'quotas_on' => quotas_on(),
-        'admin_email' => (string) ($c['admin_email'] ?? ''),
+        'admin_email' =>
+            (string) (
+                $c['admin_email'] ?? ''
+            ),
         'server_url' => site_url(),
-        'students' => count(student_names()),
-        'online' => count(array_intersect_key(online_users(), student_names())),
+        'students' =>
+            count(student_names()),
+        'online' =>
+            count(
+                array_intersect_key(
+                    online_users(),
+                    student_names()
+                )
+            ),
     ];
+
     $alerts = [];
-    if ($h['disk']['percent'] >= 80) $alerts[] = ['danger', "The disk is {$h['disk']['percent']}% full."];
-    if ($h['memory']['percent'] >= 90) $alerts[] = ['danger', "Memory is {$h['memory']['percent']}% used."];
-    foreach ($services as $svc => $state) {
-        if ($state !== 'active') $alerts[] = ['danger', "{$svc} is {$state}."];
+
+    if (
+        $h['disk']['percent'] >= 80
+    ) {
+        $alerts[] = [
+            'danger',
+            "The disk is {$h['disk']['percent']}% full."
+        ];
     }
-    if (!$h['logind_ok']) $alerts[] = ['danger', 'The login service is not answering, so SSH logins may fail. It restarts itself within 2 minutes; if not, reboot.'];
-    if (!$h['quotas_on']) $alerts[] = ['warning', 'Disk quotas are off, so students have no disk limit.'];
-    if ($h['admin_email'] === '') $alerts[] = ['warning', 'No admin_email is set, so disk and login alerts are not emailed.'];
+
+    if (
+        $h['memory']['percent'] >= 90
+    ) {
+        $alerts[] = [
+            'danger',
+            "Memory is {$h['memory']['percent']}% used."
+        ];
+    }
+
+    foreach (
+        $services as $svc => $state
+    ) {
+        if ($state !== 'active') {
+            $alerts[] = [
+                'danger',
+                "{$svc} is {$state}."
+            ];
+        }
+    }
+
+    if (!$h['logind_ok']) {
+        $alerts[] = [
+            'danger',
+            'The login service is not answering, so SSH logins may fail. It restarts itself within 2 minutes; if not, reboot.'
+        ];
+    }
+
+    if (!$h['quotas_on']) {
+        $alerts[] = [
+            'warning',
+            'Disk quotas are off, so students have no disk limit.'
+        ];
+    }
+
+    if ($h['admin_email'] === '') {
+        $alerts[] = [
+            'warning',
+            'No admin_email is set, so disk and login alerts are not emailed.'
+        ];
+    }
+
     $h['alerts'] = $alerts;
+
     return $h;
 }
 
 function bans(): array {
     $out = [];
-    foreach (['sshd', 'recidive'] as $jail) {
-        [$code, $status] = run(['fail2ban-client', 'status', $jail]);
-        $list = preg_match('/Banned IP list:\s*(.*)$/m', $status, $m) ? preg_split('/\s+/', trim($m[1]), -1, PREG_SPLIT_NO_EMPTY) : [];
-        $out[] = ['jail' => $jail, 'running' => $code === 0, 'banned' => $list];
+
+    foreach (
+        ['sshd', 'recidive'] as $jail
+    ) {
+        [
+            $code,
+            $status
+        ] = run([
+            'fail2ban-client',
+            'status',
+            $jail
+        ]);
+
+        $list = preg_match(
+            '/Banned IP list:\s*(.*)$/m',
+            $status,
+            $m
+        )
+            ? preg_split(
+                '/\s+/',
+                trim($m[1]),
+                -1,
+                PREG_SPLIT_NO_EMPTY
+            )
+            : [];
+
+        $out[] = [
+            'jail' => $jail,
+            'running' => $code === 0,
+            'banned' => $list
+        ];
     }
+
     return $out;
 }
 
-function tail_log(string $which, int $lines, string $filter): array {
-    $file = LOGS[$which] ?? refuse('Unknown log.');
-    [, $out] = run(['tail', '-n', (string) max(10, min($lines, 2000)), $file]);
-    $rows = array_values(array_filter(explode("\n", $out), fn($l) => $l !== ''
-        && ($filter === '' || stripos($l, $filter) !== false)));
+function tail_log(
+    string $which,
+    int $lines,
+    string $filter
+): array {
+    $file =
+        LOGS[$which] ??
+        refuse('Unknown log.');
+
+    [
+        ,
+        $out
+    ] = run([
+        'tail',
+        '-n',
+        (string) max(
+            10,
+            min($lines, 2000)
+        ),
+        $file
+    ]);
+
+    $rows = array_values(
+        array_filter(
+            explode(
+                "\n",
+                $out
+            ),
+            fn($l) =>
+                $l !== '' &&
+                (
+                    $filter === '' ||
+                    stripos(
+                        $l,
+                        $filter
+                    ) !== false
+                )
+        )
+    );
+
     return array_reverse($rows);
 }
 
@@ -470,347 +1326,1525 @@ function tail_log(string $which, int $lines, string $filter): array {
 
 function valid_address(string $a): bool {
     if (str_contains($a, '/')) {
-        [$ip, $bits] = explode('/', $a, 2);
-        $max = str_contains($ip, ':') ? 128 : 32;
-        return filter_var($ip, FILTER_VALIDATE_IP) !== false && ctype_digit($bits) && (int) $bits >= 8 && (int) $bits <= $max;
+        [
+            $ip,
+            $bits
+        ] = explode(
+            '/',
+            $a,
+            2
+        );
+
+        $max =
+            str_contains($ip, ':')
+                ? 128
+                : 32;
+
+        return (
+            filter_var(
+                $ip,
+                FILTER_VALIDATE_IP
+            ) !== false &&
+            ctype_digit($bits) &&
+            (int) $bits >= 8 &&
+            (int) $bits <= $max
+        );
     }
-    return filter_var($a, FILTER_VALIDATE_IP) !== false;
+
+    return filter_var(
+        $a,
+        FILTER_VALIDATE_IP
+    ) !== false;
 }
 
 function allowlist(): array {
     $list = [];
-    foreach (@file(ALLOW_FILE, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
-        if (preg_match('/^\s*allow\s+([^;\s]+)\s*;/', $line, $m) && !in_array($m[1], ['127.0.0.1', '::1'], true)) {
+
+    foreach (
+        @file(
+            ALLOW_FILE,
+            FILE_IGNORE_NEW_LINES
+        ) ?: [] as $line
+    ) {
+        if (
+            preg_match(
+                '/^\s*allow\s+([^;\s]+)\s*;/',
+                $line,
+                $m
+            ) &&
+            !in_array(
+                $m[1],
+                ['127.0.0.1', '::1'],
+                true
+            )
+        ) {
             $list[] = $m[1];
         }
     }
+
     return $list;
 }
 
-function ip_in(string $ip, string $entry): bool {
+function ip_in(
+    string $ip,
+    string $entry
+): bool {
     if (!str_contains($entry, '/')) {
         return inet_pton($ip) === inet_pton($entry);
     }
-    [$net, $bits] = explode('/', $entry, 2);
+
+    [
+        $net,
+        $bits
+    ] = explode(
+        '/',
+        $entry,
+        2
+    );
+
     $a = inet_pton($ip);
     $b = inet_pton($net);
-    if ($a === false || $b === false || strlen($a) !== strlen($b)) return false;
+
+    if (
+        $a === false ||
+        $b === false ||
+        strlen($a) !== strlen($b)
+    ) {
+        return false;
+    }
+
     $bits = (int) $bits;
     $bytes = intdiv($bits, 8);
-    if (substr($a, 0, $bytes) !== substr($b, 0, $bytes)) return false;
+
+    if (
+        substr(
+            $a,
+            0,
+            $bytes
+        ) !== substr(
+            $b,
+            0,
+            $bytes
+        )
+    ) {
+        return false;
+    }
+
     $rem = $bits % 8;
-    return $rem === 0 || ((ord($a[$bytes]) ^ ord($b[$bytes])) & (0xFF << (8 - $rem)) & 0xFF) === 0;
+
+    return (
+        $rem === 0 ||
+        (
+            (
+                ord($a[$bytes]) ^
+                ord($b[$bytes])
+            ) &
+            (0xFF << (8 - $rem)) &
+            0xFF
+        ) === 0
+    );
 }
 
-function write_allowlist(array $entries, string $ip): void {
-    $entries = array_values(array_unique(array_filter(array_map('trim', $entries))));
+function write_allowlist(
+    array $entries,
+    string $ip
+): void {
+    $entries = array_values(
+        array_unique(
+            array_filter(
+                array_map(
+                    'trim',
+                    $entries
+                )
+            )
+        )
+    );
+
     foreach ($entries as $e) {
-        if (!valid_address($e)) refuse("\"{$e}\" is not an IP address or range (like 10.21.4.57 or 10.21.4.0/24).");
+        if (!valid_address($e)) {
+            refuse(
+                "\"{$e}\" is not an IP address or range (like 10.21.4.57 or 10.21.4.0/24)."
+            );
+        }
     }
-    $covered = in_array($ip, ['127.0.0.1', '::1'], true);
+
+    $covered =
+        in_array(
+            $ip,
+            ['127.0.0.1', '::1'],
+            true
+        );
+
     foreach ($entries as $e) {
-        $covered = $covered || ip_in($ip, $e);
+        $covered =
+            $covered ||
+            ip_in($ip, $e);
     }
-    if (!$covered) refuse("That would lock you out: your address {$ip} must stay on the list.");
-    $body = "# Addresses allowed to open the admin panel. Written by the panel (Security page)\n"
-        . "# or bin/admin-allow.sh. The server itself is always allowed.\n"
-        . "allow 127.0.0.1;\nallow ::1;\n";
-    foreach ($entries as $e) $body .= "allow {$e};\n";
+
+    if (!$covered) {
+        refuse(
+            "That would lock you out: your address {$ip} must stay on the list."
+        );
+    }
+
+    $body =
+        "# Addresses allowed to open the admin panel. Written by the panel (Security page)\n" .
+        "# or bin/admin-allow.sh. The server itself is always allowed.\n" .
+        "allow 127.0.0.1;\n" .
+        "allow ::1;\n";
+
+    foreach ($entries as $e) {
+        $body .=
+            "allow {$e};\n";
+    }
+
     $body .= "deny all;\n";
-    $old = @file_get_contents(ALLOW_FILE);
-    file_put_contents(ALLOW_FILE, $body, LOCK_EX);
-    [$code, , $err] = run(['nginx', '-t']);
+
+    $old = @file_get_contents(
+        ALLOW_FILE
+    );
+
+    file_put_contents(
+        ALLOW_FILE,
+        $body,
+        LOCK_EX
+    );
+
+    [
+        $code,
+        ,
+        $err
+    ] = run([
+        'nginx',
+        '-t'
+    ]);
+
     if ($code !== 0) {
-        if ($old !== false) file_put_contents(ALLOW_FILE, $old);
-        refuse('nginx rejected the list, nothing was changed: ' . trim($err));
+        if ($old !== false) {
+            file_put_contents(
+                ALLOW_FILE,
+                $old
+            );
+        }
+
+        refuse(
+            'nginx rejected the list, nothing was changed: ' .
+            trim($err)
+        );
     }
-    run(['systemctl', 'reload', 'nginx']);
+
+    run([
+        'systemctl',
+        'reload',
+        'nginx'
+    ]);
 }
 
 // ---------------------------------------------------------------------------------------------
 // Background jobs
 
-function start_job(string $kind, array $params, string $admin, string $ip): string {
-    @mkdir(JOB_DIR, 0700, true);
-    $id = date('Ymd-His') . '-' . bin2hex(random_bytes(3));
-    mkdir(JOB_DIR . "/{$id}", 0700);
-    file_put_contents(JOB_DIR . "/{$id}/meta.json", json_encode(
-        ['kind' => $kind, 'params' => $params, 'admin' => $admin, 'ip' => $ip, 'started' => time()]));
-    $self = DEPLOY_ROOT . '/bin/admin-action';
+function start_job(
+    string $kind,
+    array $params,
+    string $admin,
+    string $ip
+): string {
+    @mkdir(
+        JOB_DIR,
+        0700,
+        true
+    );
+
+    $id =
+        date('Ymd-His') .
+        '-' .
+        bin2hex(
+            random_bytes(3)
+        );
+
+    mkdir(
+        JOB_DIR . "/{$id}",
+        0700
+    );
+
+    file_put_contents(
+        JOB_DIR . "/{$id}/meta.json",
+        json_encode([
+            'kind' => $kind,
+            'params' => $params,
+            'admin' => $admin,
+            'ip' => $ip,
+            'started' => time()
+        ])
+    );
+
+    $self =
+        DEPLOY_ROOT .
+        '/bin/admin-action';
+
     if (is_dir('/run/systemd/system')) {
-        run(['systemd-run', '--quiet', '--collect', "--unit=5cs045-job-{$id}", $self, '--job', $id]);
+        run([
+            'systemd-run',
+            '--quiet',
+            '--collect',
+            "--unit=5cs045-job-{$id}",
+            $self,
+            '--job',
+            $id
+        ]);
     } else {
-        exec('setsid ' . escapeshellarg($self) . ' --job ' . escapeshellarg($id) . ' >/dev/null 2>&1 &');
+        exec(
+            'setsid ' .
+            escapeshellarg($self) .
+            ' --job ' .
+            escapeshellarg($id) .
+            ' >/dev/null 2>&1 &'
+        );
     }
-    // Keep the 30 most recent jobs
-    $all = glob(JOB_DIR . '/*', GLOB_ONLYDIR) ?: [];
+
+    $all =
+        glob(
+            JOB_DIR . '/*',
+            GLOB_ONLYDIR
+        ) ?: [];
+
     rsort($all);
-    foreach (array_slice($all, 30) as $old) {
-        array_map('unlink', glob("{$old}/*") ?: []);
+
+    foreach (
+        array_slice($all, 30)
+        as $old
+    ) {
+        array_map(
+            'unlink',
+            glob(
+                "{$old}/*"
+            ) ?: []
+        );
+
         @rmdir($old);
     }
+
     return $id;
 }
 
 function job_status(string $id): array {
-    if (!preg_match('/^\d{8}-\d{6}-[a-f0-9]{6}$/', $id) || !is_dir(JOB_DIR . "/{$id}")) refuse('No such job.');
-    $meta = json_decode((string) file_get_contents(JOB_DIR . "/{$id}/meta.json"), true) ?: [];
-    $exit = @file_get_contents(JOB_DIR . "/{$id}/exit");
-    [, $log] = run(['tail', '-n', '400', JOB_DIR . "/{$id}/log"]);
-    unset($meta['params']['emails']);
-    return $meta + ['id' => $id, 'done' => $exit !== false, 'exit' => $exit === false ? null : (int) $exit, 'log' => $log];
+    if (
+        !preg_match(
+            '/^\d{8}-\d{6}-[a-f0-9]{6}$/',
+            $id
+        ) ||
+        !is_dir(
+            JOB_DIR . "/{$id}"
+        )
+    ) {
+        refuse('No such job.');
+    }
+
+    $meta =
+        json_decode(
+            (string) file_get_contents(
+                JOB_DIR . "/{$id}/meta.json"
+            ),
+            true
+        ) ?: [];
+
+    $exit =
+        @file_get_contents(
+            JOB_DIR . "/{$id}/exit"
+        );
+
+    [
+        ,
+        $log
+    ] = run([
+        'tail',
+        '-n',
+        '400',
+        JOB_DIR . "/{$id}/log"
+    ]);
+
+    unset(
+        $meta['params']['emails']
+    );
+
+    return $meta + [
+        'id' => $id,
+        'done' => $exit !== false,
+        'exit' =>
+            $exit === false
+                ? null
+                : (int) $exit,
+        'log' => $log
+    ];
 }
 
 function run_job(string $id): void {
-    if (!preg_match('/^\d{8}-\d{6}-[a-f0-9]{6}$/', $id)) exit(1);
-    $dir = JOB_DIR . "/{$id}";
-    $meta = json_decode((string) file_get_contents("{$dir}/meta.json"), true);
-    $log = fopen("{$dir}/log", 'a');
-    $say = function (string $s) use ($log) { fwrite($log, $s . "\n"); fflush($log); };
-    $stream = function (array $cmd) use ($log): int {
-        $proc = proc_open($cmd, [0 => ['file', '/dev/null', 'r'], 1 => $log, 2 => $log], $pipes);
-        return is_resource($proc) ? proc_close($proc) : 127;
-    };
+    if (
+        !preg_match(
+            '/^\d{8}-\d{6}-[a-f0-9]{6}$/',
+            $id
+        )
+    ) {
+        exit(1);
+    }
+
+    $dir =
+        JOB_DIR . "/{$id}";
+
+    $meta =
+        json_decode(
+            (string) file_get_contents(
+                "{$dir}/meta.json"
+            ),
+            true
+        );
+
+    $log =
+        fopen(
+            "{$dir}/log",
+            'a'
+        );
+
+    $say =
+        function (string $s) use ($log) {
+            fwrite(
+                $log,
+                $s . "\n"
+            );
+
+            fflush($log);
+        };
+
+    $stream =
+        function (array $cmd) use ($log): int {
+            $proc = proc_open(
+                $cmd,
+                [
+                    0 => [
+                        'file',
+                        '/dev/null',
+                        'r'
+                    ],
+                    1 => $log,
+                    2 => $log
+                ],
+                $pipes
+            );
+
+            return is_resource($proc)
+                ? proc_close($proc)
+                : 127;
+        };
+
     $code = 1;
-    switch ($meta['kind'] ?? '') {
+
+    switch (
+        $meta['kind'] ?? ''
+    ) {
         case 'smoke-test':
-            $code = $stream([DEPLOY_ROOT . '/test/smoke-test.sh']);
+            $code =
+                $stream([
+                    DEPLOY_ROOT .
+                    '/test/smoke-test.sh'
+                ]);
             break;
+
         case 'remove-all':
-            $code = $stream([DEPLOY_ROOT . '/bin/remove-all-students.sh', '--yes']);
+            $code =
+                $stream([
+                    DEPLOY_ROOT .
+                    '/bin/remove-all-students.sh',
+                    '--yes'
+                ]);
             break;
+
         case 'bulk-add':
-            $code = bulk_add($meta['params'], $say);
+            $code =
+                bulk_add(
+                    $meta['params'],
+                    $say
+                );
             break;
     }
-    audit((string) ($meta['admin'] ?? '?'), (string) ($meta['ip'] ?? '?'), "job {$id} ({$meta['kind']}) finished with exit {$code}");
-    file_put_contents("{$dir}/exit", (string) $code);
+
+    audit(
+        (string) (
+            $meta['admin'] ?? '?'
+        ),
+        (string) (
+            $meta['ip'] ?? '?'
+        ),
+        "job {$id} ({$meta['kind']}) finished with exit {$code}"
+    );
+
+    file_put_contents(
+        "{$dir}/exit",
+        (string) $code
+    );
 }
 
-function bulk_add(array $p, callable $say): int {
+function bulk_add(
+    array $p,
+    callable $say
+): int {
     require_once WEB_LIB . '/credentials.php';
-    $emails = array_values(array_unique(array_filter(array_map(fn($e) => strtolower(trim($e)),
-        preg_split('/[\s,;]+/', (string) ($p['emails'] ?? ''))))));
-    $send = !empty($p['send_email']);
-    $domain = (string) (smtp()['allowed_email_domain'] ?? '');
-    $made = $skipped = $failed = 0;
-    $say(count($emails) . ' email address(es) to process.' . ($send ? ' Each new student is emailed their login.' : ''));
+
+    $emails = array_values(
+        array_unique(
+            array_filter(
+                array_map(
+                    fn($e) => strtolower(
+                        trim($e)
+                    ),
+                    preg_split(
+                        '/[\s,;]+/',
+                        (string) (
+                            $p['emails'] ?? ''
+                        )
+                    )
+                )
+            )
+        )
+    );
+
+    $send =
+        !empty(
+            $p['send_email']
+        );
+
+    $domain =
+        (string) (
+            smtp()['allowed_email_domain'] ?? ''
+        );
+
+    $made =
+        $skipped =
+        $failed = 0;
+
+    $say(
+        count($emails) .
+        ' email address(es) to process.' .
+        (
+            $send
+                ? ' Each new student is emailed their login.'
+                : ''
+        )
+    );
+
     foreach ($emails as $email) {
-        $user = valid_email($email) ? derive_username($email) : null;
-        if ($user === null) { $say("SKIPPED {$email}: not a usable email address"); $skipped++; continue; }
-        if ($domain !== '' && strcasecmp(substr($email, strrpos($email, '@') + 1), $domain) !== 0) {
-            $say("SKIPPED {$email}: not an @{$domain} address"); $skipped++; continue;
+        $user =
+            valid_email($email)
+                ? derive_username($email)
+                : null;
+
+        if ($user === null) {
+            $say(
+                "SKIPPED {$email}: not a usable email address"
+            );
+
+            $skipped++;
+            continue;
         }
-        if (posix_getpwnam($user) !== false) { $say("SKIPPED {$email}: {$user} already exists"); $skipped++; continue; }
-        [$code, $out, $err] = run([DEPLOY_ROOT . '/bin/add-student.sh', '-u', $user, '-e', $email, '-R']);
-        if ($code !== 0) { $say("FAILED {$email}: " . trim($err ?: $out)); $failed++; continue; }
-        remember_email($user, $email);
+
+        if (
+            $domain !== '' &&
+            strcasecmp(
+                substr(
+                    $email,
+                    strrpos($email, '@') + 1
+                ),
+                $domain
+            ) !== 0
+        ) {
+            $say(
+                "SKIPPED {$email}: not an @{$domain} address"
+            );
+
+            $skipped++;
+            continue;
+        }
+
+        if (
+            posix_getpwnam($user) !== false
+        ) {
+            $say(
+                "SKIPPED {$email}: {$user} already exists"
+            );
+
+            $skipped++;
+            continue;
+        }
+
+        [
+            $code,
+            $out,
+            $err
+        ] = run([
+            DEPLOY_ROOT .
+            '/bin/add-student.sh',
+            '-u',
+            $user,
+            '-e',
+            $email,
+            '-R'
+        ]);
+
+        if ($code !== 0) {
+            $say(
+                "FAILED {$email}: " .
+                trim($err ?: $out)
+            );
+
+            $failed++;
+            continue;
+        }
+
+        remember_email(
+            $user,
+            $email
+        );
+
         $made++;
-        $mailError = $send ? send_credentials($user, $email) : null;
-        $say("ADDED {$user} ({$email})" . ($send ? ($mailError ? " - email FAILED: {$mailError}" : ' - emailed') : ''));
+
+        $mailError =
+            $send
+                ? send_credentials(
+                    $user,
+                    $email
+                )
+                : null;
+
+        $say(
+            "ADDED {$user} ({$email})" .
+            (
+                $send
+                    ? (
+                        $mailError
+                            ? " - email FAILED: {$mailError}"
+                            : ' - emailed'
+                    )
+                    : ''
+            )
+        );
     }
-    $say('Reloading PHP and systemd once for the new accounts...');
-    run(['systemctl', 'daemon-reload']);
-    run(['systemctl', 'reload', 'php8.3-fpm']);
-    $say("Done: {$made} added, {$skipped} skipped, {$failed} failed.");
-    return $failed > 0 ? 1 : 0;
+
+    $say(
+        'Reloading PHP and systemd once for the new accounts...'
+    );
+
+    run([
+        'systemctl',
+        'daemon-reload'
+    ]);
+
+    run([
+        'systemctl',
+        'reload',
+        'php8.3-fpm'
+    ]);
+
+    $say(
+        "Done: {$made} added, {$skipped} skipped, {$failed} failed."
+    );
+
+    return $failed > 0
+        ? 1
+        : 0;
 }
 
 // ---------------------------------------------------------------------------------------------
 // Entry point
 
 if (posix_geteuid() !== 0) {
-    refuse('admin-action must run as root.');
+    refuse(
+        'admin-action must run as root.'
+    );
 }
+
 umask(0077);
-if (($argv[1] ?? '') === '--job') {
-    run_job($argv[2] ?? '');
+
+if (
+    ($argv[1] ?? '') === '--job'
+) {
+    run_job(
+        $argv[2] ?? ''
+    );
+
     exit(0);
 }
 
-$req = json_decode((string) stream_get_contents(STDIN), true);
-if (!is_array($req)) refuse('Bad request.');
-$action = (string) ($req['action'] ?? '');
-$ip = (string) ($req['ip'] ?? '');
-$args = is_array($req['args'] ?? null) ? $req['args'] : [];
-if (filter_var($ip, FILTER_VALIDATE_IP) === false) refuse('Bad request.');
+$req =
+    json_decode(
+        (string) stream_get_contents(STDIN),
+        true
+    );
+
+if (!is_array($req)) {
+    refuse('Bad request.');
+}
+
+$action =
+    (string) (
+        $req['action'] ?? ''
+    );
+
+$ip =
+    (string) (
+        $req['ip'] ?? ''
+    );
+
+$args =
+    is_array(
+        $req['args'] ?? null
+    )
+        ? $req['args']
+        : [];
+
+if (
+    filter_var(
+        $ip,
+        FILTER_VALIDATE_IP
+    ) === false
+) {
+    refuse('Bad request.');
+}
 
 if ($action === 'login') {
-    do_login($args, $ip);
+    do_login(
+        $args,
+        $ip
+    );
 }
-$admin = check_token((string) ($req['token'] ?? ''), $ip);
+
+$admin =
+    check_token(
+        (string) (
+            $req['token'] ?? ''
+        ),
+        $ip
+    );
 
 switch ($action) {
     case 'logout':
-        @unlink(AUTH_DIR . '/sessions/' . hash('sha256', (string) $req['token']));
-        audit($admin, $ip, 'signed out');
+        @unlink(
+            AUTH_DIR .
+            '/sessions/' .
+            hash(
+                'sha256',
+                (string) $req['token']
+            )
+        );
+
+        audit(
+            $admin,
+            $ip,
+            'signed out'
+        );
+
         reply(true);
 
     case 'ping':
-        reply(['user' => $admin]);
+        reply([
+            'user' => $admin
+        ]);
 
     case 'health':
-        reply(health());
+        reply(
+            health()
+        );
 
     case 'students':
-        reply(students_list());
+        reply(
+            students_list()
+        );
 
     case 'student':
-        $user = student_or_refuse(arg($args, 'username'));
-        foreach (students_list() as $row) {
-            if ($row['username'] === $user) {
-                $row['quota_override'] = is_file(QUOTA_OVERRIDE_DIR . "/{$user}");
-                $row['has_saved_password'] = saved_password($user) !== null;
-                $row['db_limit_mb'] = DB_LIMIT_MB;
-                $row['default_quota_mb'] = DEFAULT_QUOTA_MB;
-                $row['server_url'] = site_url();
+        $user =
+            student_or_refuse(
+                arg(
+                    $args,
+                    'username'
+                )
+            );
+
+        foreach (
+            students_list()
+            as $row
+        ) {
+            if (
+                $row['username'] === $user
+            ) {
+                $row['quota_override'] =
+                    is_file(
+                        QUOTA_OVERRIDE_DIR .
+                        "/{$user}"
+                    );
+
+                $row['has_saved_password'] =
+                    saved_password($user) !== null;
+
+                $row['db_limit_mb'] =
+                    DB_LIMIT_MB;
+
+                $row['default_quota_mb'] =
+                    DEFAULT_QUOTA_MB;
+
+                $row['server_url'] =
+                    site_url();
+
                 reply($row);
             }
         }
-        refuse("There is no student called {$user}.");
+
+        refuse(
+            "There is no student called {$user}."
+        );
 
     case 'add-student':
         require_once WEB_LIB . '/credentials.php';
-        $email = strtolower(arg($args, 'email'));
-        $name = preg_replace('/[^\p{L}\p{N} .\'-]/u', '', arg($args, 'full_name'));
-        if ($email !== '' && !valid_email($email)) refuse('That email address does not look right.');
-        $user = arg($args, 'username') ?: ($email !== '' ? (string) derive_username($email) : '');
-        if (!preg_match(USERNAME_RE, $user)) refuse('Give a username (3-32 lowercase letters, numbers or _ , starting with a letter) or an email to make one from.');
-        if (posix_getpwnam($user) !== false) refuse("{$user} already exists.");
-        $cmd = [DEPLOY_ROOT . '/bin/add-student.sh', '-u', $user, '-d'];
-        if ($name !== '') array_push($cmd, '-n', $name);
-        if ($email !== '') array_push($cmd, '-e', $email);
-        [$code, $out, $err] = run($cmd);
-        if ($code !== 0) refuse('Could not create the account: ' . trim($err ?: $out));
-        if ($email !== '') remember_email($user, $email);
-        $mailError = ($email !== '' && !empty($args['send_email'])) ? send_credentials($user, $email) : null;
-        audit($admin, $ip, "added student {$user}" . ($email !== '' ? " ({$email})" : ''));
-        reply(['username' => $user, 'password' => saved_password($user), 'emailed' => $email !== '' && !empty($args['send_email']) && $mailError === null,
-               'email' => $email ?: null, 'email_error' => $mailError]);
+
+        $email =
+            strtolower(
+                arg(
+                    $args,
+                    'email'
+                )
+            );
+
+        $name =
+            preg_replace(
+                '/[^\p{L}\p{N} .\'-]/u',
+                '',
+                arg(
+                    $args,
+                    'full_name'
+                )
+            );
+
+        if (
+            $email !== '' &&
+            !valid_email($email)
+        ) {
+            refuse(
+                'That email address does not look right.'
+            );
+        }
+
+        $user =
+            arg(
+                $args,
+                'username'
+            ) ?:
+            (
+                $email !== ''
+                    ? (string) derive_username($email)
+                    : ''
+            );
+
+        if (!preg_match(
+            USERNAME_RE,
+            $user
+        )) {
+            refuse(
+                'Give a username (3-32 lowercase letters, numbers or _ , starting with a letter) or an email to make one from.'
+            );
+        }
+
+        if (
+            posix_getpwnam($user) !== false
+        ) {
+            refuse(
+                "{$user} already exists."
+            );
+        }
+
+        $cmd = [
+            DEPLOY_ROOT .
+            '/bin/add-student.sh',
+            '-u',
+            $user,
+            '-d'
+        ];
+
+        if ($name !== '') {
+            array_push(
+                $cmd,
+                '-n',
+                $name
+            );
+        }
+
+        if ($email !== '') {
+            array_push(
+                $cmd,
+                '-e',
+                $email
+            );
+        }
+
+        [
+            $code,
+            $out,
+            $err
+        ] = run($cmd);
+
+        if ($code !== 0) {
+            refuse(
+                'Could not create the account: ' .
+                trim($err ?: $out)
+            );
+        }
+
+        if ($email !== '') {
+            remember_email(
+                $user,
+                $email
+            );
+        }
+
+        $mailError =
+            (
+                $email !== '' &&
+                !empty(
+                    $args['send_email']
+                )
+            )
+                ? send_credentials(
+                    $user,
+                    $email
+                )
+                : null;
+
+        audit(
+            $admin,
+            $ip,
+            "added student {$user}" .
+            (
+                $email !== ''
+                    ? " ({$email})"
+                    : ''
+            )
+        );
+
+        reply([
+            'username' =>
+                $user,
+            'password' =>
+                saved_password($user),
+            'emailed' =>
+                $email !== '' &&
+                !empty(
+                    $args['send_email']
+                ) &&
+                $mailError === null,
+            'email' =>
+                $email ?: null,
+            'email_error' =>
+                $mailError
+        ]);
 
     case 'reset-password':
-        $user = student_or_refuse(arg($args, 'username'));
-        [$code, $out, $err] = run([DEPLOY_ROOT . '/bin/reset-student-password.sh', '-u', $user]);
-        if ($code !== 0) refuse('Could not reset the password: ' . trim($err ?: $out));
-        $email = strtolower(arg($args, 'email'));
-        $mailError = null;
-        if ($email !== '') {
-            if (!valid_email($email)) refuse('The password was changed, but that email address does not look right.');
-            remember_email($user, $email);
-            $mailError = send_credentials($user, $email);
+        $user =
+            student_or_refuse(
+                arg(
+                    $args,
+                    'username'
+                )
+            );
+
+        [
+            $code,
+            $out,
+            $err
+        ] = run([
+            DEPLOY_ROOT .
+            '/bin/reset-student-password.sh',
+            '-u',
+            $user
+        ]);
+
+        if ($code !== 0) {
+            refuse(
+                'Could not reset the password: ' .
+                trim($err ?: $out)
+            );
         }
-        audit($admin, $ip, "reset the password of {$user}" . ($email !== '' ? " and emailed {$email}" : ''));
-        reply(['username' => $user, 'password' => saved_password($user), 'emailed' => $email !== '' && $mailError === null, 'email_error' => $mailError]);
+
+        $email =
+            strtolower(
+                arg(
+                    $args,
+                    'email'
+                )
+            );
+
+        $mailError = null;
+
+        if ($email !== '') {
+            if (!valid_email($email)) {
+                refuse(
+                    'The password was changed, but that email address does not look right.'
+                );
+            }
+
+            remember_email(
+                $user,
+                $email
+            );
+
+            $mailError =
+                send_credentials(
+                    $user,
+                    $email
+                );
+        }
+
+        audit(
+            $admin,
+            $ip,
+            "reset the password of {$user}" .
+            (
+                $email !== ''
+                    ? " and emailed {$email}"
+                    : ''
+            )
+        );
+
+        reply([
+            'username' =>
+                $user,
+            'password' =>
+                saved_password($user),
+            'emailed' =>
+                $email !== '' &&
+                $mailError === null,
+            'email_error' =>
+                $mailError
+        ]);
 
     case 'resend':
-        $user = student_or_refuse(arg($args, 'username'));
-        $email = strtolower(arg($args, 'email'));
-        if (!valid_email($email)) refuse('That email address does not look right.');
-        $mailError = send_credentials($user, $email);
-        if ($mailError !== null) refuse("The email could not be sent: {$mailError}");
-        remember_email($user, $email);
-        audit($admin, $ip, "emailed the login of {$user} to {$email}");
-        reply(['emailed' => $email]);
+        $user =
+            student_or_refuse(
+                arg(
+                    $args,
+                    'username'
+                )
+            );
+
+        $email =
+            strtolower(
+                arg(
+                    $args,
+                    'email'
+                )
+            );
+
+        if (!valid_email($email)) {
+            refuse(
+                'That email address does not look right.'
+            );
+        }
+
+        $mailError =
+            send_credentials(
+                $user,
+                $email
+            );
+
+        if ($mailError !== null) {
+            refuse(
+                "The email could not be sent: {$mailError}"
+            );
+        }
+
+        remember_email(
+            $user,
+            $email
+        );
+
+        audit(
+            $admin,
+            $ip,
+            "emailed the login of {$user} to {$email}"
+        );
+
+        reply([
+            'emailed' => $email
+        ]);
 
     case 'show-password':
-        $user = student_or_refuse(arg($args, 'username'));
-        audit($admin, $ip, "viewed the saved password of {$user}");
-        reply(['password' => saved_password($user)]);
+        $user =
+            student_or_refuse(
+                arg(
+                    $args,
+                    'username'
+                )
+            );
+
+        audit(
+            $admin,
+            $ip,
+            "viewed the saved password of {$user}"
+        );
+
+        reply([
+            'password' =>
+                saved_password($user)
+        ]);
 
     case 'set-quota':
-        $user = student_or_refuse(arg($args, 'username'));
-        $mb = (int) arg($args, 'mb');
-        if ($mb < 50 || $mb > 20480) refuse('Choose a disk limit between 50 MB and 20 GB.');
-        @mkdir(QUOTA_OVERRIDE_DIR, 0700, true);
-        if ($mb === DEFAULT_QUOTA_MB) {
-            @unlink(QUOTA_OVERRIDE_DIR . "/{$user}");
-        } else {
-            file_put_contents(QUOTA_OVERRIDE_DIR . "/{$user}", (string) ($mb * 1024));
+        $user =
+            student_or_refuse(
+                arg(
+                    $args,
+                    'username'
+                )
+            );
+
+        $mb =
+            (int) arg(
+                $args,
+                'mb'
+            );
+
+        if (
+            $mb < 50 ||
+            $mb > 20480
+        ) {
+            refuse(
+                'Choose a disk limit between 50 MB and 20 GB.'
+            );
         }
-        [$code, $out, $err] = run([DEPLOY_ROOT . '/bin/apply-student-limits.sh', '--no-reload', $user]);
-        if ($code !== 0) refuse('Could not set the limit: ' . trim($err ?: $out));
-        audit($admin, $ip, "set the disk limit of {$user} to {$mb} MB");
-        reply(['username' => $user, 'mb' => $mb,
-               'warning' => quotas_on() ? null : 'Disk quotas are off on this server, so the limit is saved but not enforced yet.']);
+
+        @mkdir(
+            QUOTA_OVERRIDE_DIR,
+            0700,
+            true
+        );
+
+        if (
+            $mb === DEFAULT_QUOTA_MB
+        ) {
+            @unlink(
+                QUOTA_OVERRIDE_DIR .
+                "/{$user}"
+            );
+        } else {
+            file_put_contents(
+                QUOTA_OVERRIDE_DIR .
+                "/{$user}",
+                (string) (
+                    $mb * 1024
+                )
+            );
+        }
+
+        [
+            $code,
+            $out,
+            $err
+        ] = run([
+            DEPLOY_ROOT .
+            '/bin/apply-student-limits.sh',
+            '--no-reload',
+            $user
+        ]);
+
+        if ($code !== 0) {
+            refuse(
+                'Could not set the limit: ' .
+                trim($err ?: $out)
+            );
+        }
+
+        audit(
+            $admin,
+            $ip,
+            "set the disk limit of {$user} to {$mb} MB"
+        );
+
+        reply([
+            'username' =>
+                $user,
+            'mb' =>
+                $mb,
+            'warning' =>
+                quotas_on()
+                    ? null
+                    : 'Disk quotas are off on this server, so the limit is saved but not enforced yet.'
+        ]);
 
     case 'remove-student':
-        $user = student_or_refuse(arg($args, 'username'));
-        if (arg($args, 'confirm') !== $user) refuse('Type the username exactly to confirm.');
-        [$code, $out, $err] = run([DEPLOY_ROOT . '/bin/remove-student.sh', '-u', $user, '--no-reload']);
-        if ($code !== 0) refuse('Could not remove the student: ' . trim($err ?: $out));
+        $user =
+            student_or_refuse(
+                arg(
+                    $args,
+                    'username'
+                )
+            );
+
+        if (
+            arg(
+                $args,
+                'confirm'
+            ) !== $user
+        ) {
+            refuse(
+                'Type the username exactly to confirm.'
+            );
+        }
+
+        [
+            $code,
+            $out,
+            $err
+        ] = run([
+            DEPLOY_ROOT .
+            '/bin/remove-student.sh',
+            '-u',
+            $user,
+            '--no-reload'
+        ]);
+
+        if ($code !== 0) {
+            refuse(
+                'Could not remove the student: ' .
+                trim($err ?: $out)
+            );
+        }
+
         reload_later();
-        audit($admin, $ip, "removed student {$user}");
-        reply(['username' => $user]);
+
+        audit(
+            $admin,
+            $ip,
+            "removed student {$user}"
+        );
+
+        reply([
+            'username' =>
+                $user
+        ]);
 
     case 'settings':
         $c = smtp();
+
         reply([
-            'server_url' => site_url(),
-            'admin_email' => (string) ($c['admin_email'] ?? ''),
-            'email_domain' => (string) ($c['allowed_email_domain'] ?? ''),
-            'smtp_ready' => ($c['host'] ?? '') !== '' && !str_contains((string) ($c['host'] ?? ''), 'example'),
-            'students' => count(student_names()),
-            'default_quota_mb' => DEFAULT_QUOTA_MB,
+            'server_url' =>
+                site_url(),
+            'admin_email' =>
+                (string) (
+                    $c['admin_email'] ?? ''
+                ),
+            'email_domain' =>
+                (string) (
+                    $c['allowed_email_domain'] ?? ''
+                ),
+            'smtp_ready' =>
+                (
+                    $c['host'] ?? ''
+                ) !== '' &&
+                !str_contains(
+                    (string) (
+                        $c['host'] ?? ''
+                    ),
+                    'example'
+                ),
+            'students' =>
+                count(
+                    student_names()
+                ),
+            'default_quota_mb' =>
+                DEFAULT_QUOTA_MB
         ]);
 
     case 'bans':
-        reply(bans());
+        reply(
+            bans()
+        );
 
     case 'unban':
-        $jail = arg($args, 'jail');
-        $addr = arg($args, 'address');
-        if (!in_array($jail, ['sshd', 'recidive'], true) || filter_var($addr, FILTER_VALIDATE_IP) === false) refuse('Bad request.');
-        [$code, $out, $err] = run(['fail2ban-client', 'set', $jail, 'unbanip', $addr]);
-        if ($code !== 0) refuse('fail2ban said: ' . trim($err ?: $out));
-        audit($admin, $ip, "unbanned {$addr} ({$jail})");
-        reply(['address' => $addr]);
+        $jail =
+            arg(
+                $args,
+                'jail'
+            );
+
+        $addr =
+            arg(
+                $args,
+                'address'
+            );
+
+        if (
+            !in_array(
+                $jail,
+                ['sshd', 'recidive'],
+                true
+            ) ||
+            filter_var(
+                $addr,
+                FILTER_VALIDATE_IP
+            ) === false
+        ) {
+            refuse(
+                'Bad request.'
+            );
+        }
+
+        [
+            $code,
+            $out,
+            $err
+        ] = run([
+            'fail2ban-client',
+            'set',
+            $jail,
+            'unbanip',
+            $addr
+        ]);
+
+        if ($code !== 0) {
+            refuse(
+                'fail2ban said: ' .
+                trim($err ?: $out)
+            );
+        }
+
+        audit(
+            $admin,
+            $ip,
+            "unbanned {$addr} ({$jail})"
+        );
+
+        reply([
+            'address' =>
+                $addr
+        ]);
 
     case 'logs':
-        reply(tail_log(arg($args, 'log', 'registration'), (int) arg($args, 'lines', '300'), arg($args, 'filter')));
+        reply(
+            tail_log(
+                arg(
+                    $args,
+                    'log',
+                    'registration'
+                ),
+                (int) arg(
+                    $args,
+                    'lines',
+                    '300'
+                ),
+                arg(
+                    $args,
+                    'filter'
+                )
+            )
+        );
 
     case 'allowlist':
-        reply(['entries' => allowlist(), 'you' => $ip]);
+        reply([
+            'entries' =>
+                allowlist(),
+            'you' =>
+                $ip
+        ]);
 
     case 'allowlist-set':
-        write_allowlist(preg_split('/[\s,]+/', arg($args, 'entries')), $ip);
-        audit($admin, $ip, 'changed the admin panel allowlist to: ' . implode(' ', allowlist()));
-        reply(['entries' => allowlist()]);
+        write_allowlist(
+            preg_split(
+                '/[\s,]+/',
+                arg(
+                    $args,
+                    'entries'
+                )
+            ),
+            $ip
+        );
+
+        audit(
+            $admin,
+            $ip,
+            'changed the admin panel allowlist to: ' .
+            implode(
+                ' ',
+                allowlist()
+            )
+        );
+
+        reply([
+            'entries' =>
+                allowlist()
+        ]);
 
     case 'test-email':
-        $email = strtolower(arg($args, 'email'));
-        if (!valid_email($email)) refuse('That email address does not look right.');
-        $err = send_mail($email, '5CS045 server: test email', "This is a test email from the 5CS045 admin panel.\n\nIf you can read this, the server can send email.");
-        if ($err !== null) refuse("The email could not be sent: {$err}");
-        audit($admin, $ip, "sent a test email to {$email}");
-        reply(['emailed' => $email]);
+        $email =
+            strtolower(
+                arg(
+                    $args,
+                    'email'
+                )
+            );
+
+        if (!valid_email($email)) {
+            refuse(
+                'That email address does not look right.'
+            );
+        }
+
+        $err =
+            send_mail(
+                $email,
+                '5CS045 server: test email',
+                "This is a test email from the 5CS045 admin panel.\n\nIf you can read this, the server can send email."
+            );
+
+        if ($err !== null) {
+            refuse(
+                "The email could not be sent: {$err}"
+            );
+        }
+
+        audit(
+            $admin,
+            $ip,
+            "sent a test email to {$email}"
+        );
+
+        reply([
+            'emailed' =>
+                $email
+        ]);
 
     case 'job-start':
-        $kind = arg($args, 'kind');
+        $kind =
+            arg(
+                $args,
+                'kind'
+            );
+
         if ($kind === 'remove-all') {
-            $count = count(student_names());
-            if ($count === 0) refuse('There are no students to remove.');
-            if (arg($args, 'confirm') !== "DELETE {$count}") refuse("Type DELETE {$count} exactly to confirm.");
-            $params = ['count' => $count];
-        } elseif ($kind === 'bulk-add') {
-            $params = ['emails' => substr(arg($args, 'emails'), 0, 200000), 'send_email' => !empty($args['send_email'])];
-            if (trim($params['emails']) === '') refuse('Paste at least one email address.');
-        } elseif ($kind === 'smoke-test') {
+            $count =
+                count(
+                    student_names()
+                );
+
+            if ($count === 0) {
+                refuse(
+                    'There are no students to remove.'
+                );
+            }
+
+            if (
+                arg(
+                    $args,
+                    'confirm'
+                ) !== "DELETE {$count}"
+            ) {
+                refuse(
+                    "Type DELETE {$count} exactly to confirm."
+                );
+            }
+
+            $params = [
+                'count' =>
+                    $count
+            ];
+        } elseif (
+            $kind === 'bulk-add'
+        ) {
+            $params = [
+                'emails' =>
+                    substr(
+                        arg(
+                            $args,
+                            'emails'
+                        ),
+                        0,
+                        200000
+                    ),
+                'send_email' =>
+                    !empty(
+                        $args['send_email']
+                    )
+            ];
+
+            if (
+                trim(
+                    $params['emails']
+                ) === ''
+            ) {
+                refuse(
+                    'Paste at least one email address.'
+                );
+            }
+        } elseif (
+            $kind === 'smoke-test'
+        ) {
             $params = [];
         } else {
-            refuse('Unknown job.');
+            refuse(
+                'Unknown job.'
+            );
         }
-        $id = start_job($kind, $params, $admin, $ip);
-        audit($admin, $ip, "started job {$id} ({$kind})");
-        reply(['id' => $id]);
+
+        $id =
+            start_job(
+                $kind,
+                $params,
+                $admin,
+                $ip
+            );
+
+        audit(
+            $admin,
+            $ip,
+            "started job {$id} ({$kind})"
+        );
+
+        reply([
+            'id' =>
+                $id
+        ]);
 
     case 'job-status':
-        reply(job_status(arg($args, 'id')));
+        reply(
+            job_status(
+                arg(
+                    $args,
+                    'id'
+                )
+            )
+        );
 
     case 'jobs':
-        $all = glob(JOB_DIR . '/*', GLOB_ONLYDIR) ?: [];
+        $all =
+            glob(
+                JOB_DIR . '/*',
+                GLOB_ONLYDIR
+            ) ?: [];
+
         rsort($all);
-        reply(array_map(fn($d) => array_diff_key(job_status(basename($d)), ['log' => 1]), array_slice($all, 0, 10)));
+
+        reply(
+            array_map(
+                fn($d) =>
+                    array_diff_key(
+                        job_status(
+                            basename($d)
+                        ),
+                        ['log' => 1]
+                    ),
+                array_slice(
+                    $all,
+                    0,
+                    10
+                )
+            )
+        );
 
     default:
-        refuse('Unknown action.');
+        refuse(
+            'Unknown action.'
+        );
 }

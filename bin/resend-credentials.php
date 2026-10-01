@@ -13,30 +13,55 @@ if (PHP_SAPI !== 'cli' || posix_geteuid() !== 0) {
 }
 
 $email = $argv[1] ?? '';
+
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    fwrite(STDERR, "Usage: sudo php resend-credentials.php student@heraldcollege.edu.np\n");
+    fwrite(
+        STDERR,
+        "Usage: sudo php resend-credentials.php student@heraldcollege.edu.np\n"
+    );
     exit(1);
 }
 
 require '/var/www/html/lib/smtp_mailer.php';
 require '/var/www/html/lib/credentials.php';
+
 $smtp = require '/etc/5cs045/smtp_config.php';
 
 // Find the username: the registration record first, otherwise work it out from the email.
 $username = null;
+
 $record = '/var/lib/5cs045-registrations/' . registration_key($email);
+
 if (is_file($record)) {
-    $username = json_decode((string) file_get_contents($record), true)['username'] ?? null;
+    $username = json_decode(
+        (string) file_get_contents($record),
+        true
+    )['username'] ?? null;
 }
+
 $username ??= derive_username($email);
 
-$credentialsFile = $username ? "/var/lib/5cs045-credentials/{$username}" : '';
+$credentialsFile = $username
+    ? "/var/lib/5cs045-credentials/{$username}"
+    : '';
+
 if ($username === null || !is_file($credentialsFile)) {
-    fwrite(STDERR, "No student account found for {$email}.\n");
+    fwrite(
+        STDERR,
+        "No student account found for {$email}.\n"
+    );
     exit(1);
 }
-if (!preg_match('/^PASSWORD=(\S+)/m', (string) file_get_contents($credentialsFile), $m)) {
-    fwrite(STDERR, "Could not read the password from {$credentialsFile}.\n");
+
+if (!preg_match(
+    '/^PASSWORD=(\S+)/m',
+    (string) file_get_contents($credentialsFile),
+    $m
+)) {
+    fwrite(
+        STDERR,
+        "Could not read the password from {$credentialsFile}.\n"
+    );
     exit(1);
 }
 
@@ -50,9 +75,29 @@ try {
         fromName: (string) $smtp['from_name'],
         useStartTls: (bool) $smtp['use_starttls'],
     );
-    $mailer->send($email, 'Your Server Credentials', credentials_email_body($username, $m[1], student_site_url($smtp)));
+
+    $serverUrl = student_site_url($smtp);
+
+    $mailer->send(
+        $email,
+        'Your Server Credentials',
+        credentials_email_body(
+            $username,
+            $m[1],
+            $serverUrl
+        ),
+        credentials_email_html(
+            $username,
+            $m[1],
+            $serverUrl
+        )
+    );
 } catch (Throwable $e) {
-    fwrite(STDERR, "Email failed: {$e->getMessage()}\n");
+    fwrite(
+        STDERR,
+        "Email failed: {$e->getMessage()}\n"
+    );
     exit(1);
 }
+
 echo "Sent the login details for {$username} to {$email}.\n";
