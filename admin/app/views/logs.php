@@ -14,6 +14,8 @@ $columns = [
     'privileged' => ['time', 'user', 'event', 'ip'],
 ];
 
+$columns = $columns[$log] ?? ['time', 'event', 'ip'];
+
 $columnLabels = [
     'time' => 'Time',
     'user' => 'User',
