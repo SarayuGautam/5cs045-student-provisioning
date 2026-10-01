@@ -46,7 +46,8 @@ If a lab computer is blocked for too many wrong passwords, it shows at the top o
 | **Students** | Find a student. Reset, email or show their password. Change their disk limit or remove them. Add a student. Unblock a lab computer. |
 | **Server** | Disk, memory and processor use, which services are running, and anything that needs attention. |
 | **Semester** | Add a whole class from a list of emails, run the health check, and remove every student at the end of term. |
-| **Security** | Blocked computers, panel allowlist, panel administrators, non-student server accounts, and test email. |
+| **Security** | Blocked computers, panel allowlist, and test email. |
+| **Admin accounts** | Create non-student server accounts, grant/revoke panel admin access, and remove temporary accounts. |
 | **Logs** | Sign-ups, account changes, panel activity, and privileged SSH/sudo activity. |
 
 Long jobs (adding a class, the health check, removing everyone) run in the background, so you can leave their page and come back later.
@@ -59,7 +60,7 @@ Students never see it. Four layers matter:
 
 1. **Its own port.** The panel is on port 8443, the student site does not link to it, and it does not answer on the students' name.
 2. **The allowed list.** Only computers on the list can open it; everyone else gets "403 Forbidden". The first install allows the computer you ran it from. Change the list on the **Security** page.
-3. **A panel role.** Only the `fullstack` account is automatically allowed and it is the only **superadmin**. Other people need an explicit **admin** role.
+3. **A panel role.** Only the `fullstack` account is automatically allowed and it is the only **superadmin**. Other people need an explicit **admin** role. The superadmin manages these accounts from **Admin accounts**.
 4. **A password.** The account's own Linux password is checked by `bin/admin-action`. After 5 wrong passwords, that account and that computer have to wait 15 minutes.
 
 You are signed out after 30 minutes without activity, and every change is recorded under **Logs → Admin panel**.
@@ -90,7 +91,7 @@ An admin who opens Semester, Security, or Logs sees a clear message that super a
 
 Only the `fullstack` superadmin can create or remove non-student server accounts from **Security**. A created account is a normal Linux account with a home directory and Bash, but it is not a student: it gets no student website folders, student database, student quota, or sudo.
 
-The form can also grant the **admin** panel role at creation time. The generated password is shown once in the panel. Save it securely and give it to the account owner.
+The form can also grant the **admin** panel role at creation time. When an email address is provided for a new admin, the panel sends the generated username, password, role, and admin-panel URL to that email. The generated password is also shown once in the panel.
 
 The old `5cs045-panel` Unix group is no longer used for panel authorization. Existing VAPT accounts from an older installation can remain as ordinary Linux accounts until the VAPT work is finished; remove their panel role and/or delete the account when you are ready.
 
@@ -153,6 +154,7 @@ Then do these three things.
 | `server_url` | The address of the student websites, used in the login email. Leave it out to use `https://fullstack-student.heraldcollege.edu.np` (the address in the student guide). An IP address here is ignored, because the websites only answer on their name. |
 | `signup_url` | The sign-up page's address, used in the link students click to create their account. Leave it out to use `https://fullstack.heraldcollege.edu.np`. An IP address is ignored here too. |
 | `admin_email` | Where server alerts go (disk nearly full, login service restarted). Empty means no alerts. |
+| `admin_panel_url` | Optional URL included in new admin credential emails. Defaults to `https://fullstack.heraldcollege.edu.np:8443`. |
 
 This file is never in Git; never put the real password anywhere else. Test it on the panel: **Security → Send a test email**.
 
