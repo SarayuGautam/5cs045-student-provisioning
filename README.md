@@ -6,7 +6,7 @@ A server for the Full Stack Development module. Every student gets their own log
 
 | I want to... | Do this |
 |---|---|
-| Open the admin panel | `https://10.80.0.250:8443`, sign in as `fullstack` with its sudo password |
+| Open the admin panel | `https://10.80.0.250:8443`, sign in as `fullstack` (the superadmin) |
 | Help a student who cannot log in | Admin panel → type their name → Enter → **Reset password** |
 | Check the server is working | Admin panel → **Semester** → **Run the health check** (every line should say PASS) |
 | Install the latest version | `cd /opt/5cs045-provisioning && git pull && sudo ./setup/update-server.sh` |
@@ -31,7 +31,7 @@ Students cannot see each other's files. Their username comes from their email: `
 
 ## The admin panel
 
-Open `https://<server>:8443` and sign in with the server's sudo account (the one you use for SSH, for example `fullstack`). The browser warns about the certificate the first time; choose to continue.
+Open `https://<server>:8443` and sign in with `fullstack` (the superadmin), or with a server account that the superadmin has granted the `admin` role. The browser warns about the certificate the first time; choose to continue.
 
 **Helping a student in a lab** (the first page is built for this):
 
@@ -51,7 +51,7 @@ If a lab computer is blocked for too many wrong passwords, it shows at the top o
 
 Long jobs (adding a class, the health check, removing everyone) run in the background, so you can leave their page and come back later.
 
-**Logs → Privileged / SSH** shows successful and failed SSH authentication for accounts with sudo, admin, or 5cs045-panel privileges, including the source IP for SSH authentication events. It also shows commands explicitly run through sudo. Student accounts are excluded. Ordinary shell commands are not recorded by sshd/auth.log, so the panel cannot claim to show every command typed in a privileged shell.
+**Logs → Privileged / SSH** shows successful and failed SSH authentication for accounts with sudo or the Unix `admin` group, including the source IP for SSH authentication events. It also shows commands explicitly run through sudo. Student accounts are excluded. Ordinary shell commands are not recorded by sshd/auth.log, so the panel cannot claim to show every command typed in a privileged shell.
 
 ### Who can open the panel
 
