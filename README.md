@@ -345,4 +345,6 @@ test/loadtest/              SSH and SCP load test
 web/                        The student sign-up page and email code
 demo-student-portfolio-blade/  Example website for students
 docs/Server_Access_Guide.docx  Guide for students
+docs/ADMIN_PANEL_ACCESS.md    Technical admin-role, authentication, and account lifecycle reference
+docs/VAPT-TEST-ACCOUNTS.md    Temporary VAPT/non-student account lifecycle
 ```
