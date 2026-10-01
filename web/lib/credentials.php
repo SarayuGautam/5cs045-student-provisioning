@@ -70,25 +70,18 @@ TXT;
 function credentials_email_body(string $username, string $password, string $serverUrl): string {
     $site = rtrim($serverUrl, '/') . '/~' . $username;
     return <<<TXT
-Your Server Credentials
 
-Welcome to the Server!
+Welcome to the Full Stack Development Module Server!
 
-Full Stack Development Module Server
-
-Here are your access details:
+Here are your access details. Please keep this safe:
 -----------------------------
 Username: {$username}
 Password: {$password}
 Database: {$username}
 
-Your websites:
-Workshops: {$site}/workshops/
-(make one folder for each week, for example workshops/week1)
-Assessment: {$site}/assessment/
-Exam: {$site}/exam/
+Your website:{$site}
 
-Please keep this safe.
+Use the attached server guide to login to the server.
 
 If you did not request this account, please contact your tutor.
 TXT;
