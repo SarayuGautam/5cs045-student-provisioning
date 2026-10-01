@@ -60,7 +60,7 @@ async function check(name, fn) {
     assert.match(await flash(), /Wrong username or password/);
   });
 
-  await check('the sudo account can sign in', async () => {
+  await check('the fullstack superadmin can sign in', async () => {
     await page.fill('input[name=password]', PASSWORD);
     await page.click('button[type=submit]');
     await page.waitForURL(`${BASE}/`);
