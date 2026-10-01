@@ -244,9 +244,15 @@ try {
     if ($path === '/logs' && !$post) {
         $log = in_array($_GET['log'] ?? '', ['registration', 'provisioning', 'admin', 'privileged'], true) ? $_GET['log'] : 'registration';
         $lines = in_array((int) ($_GET['lines'] ?? 300), [100, 300, 1000], true) ? (int) ($_GET['lines'] ?? 300) : 300;
-        $filter = substr(trim((string) ($_GET['q'] ?? '')), 0, 100);
-        render('logs', ['title' => 'Logs', 'nav' => 'logs', 'log' => $log, 'lines' => $lines, 'filter' => $filter,
-            'rows' => api('logs', ['log' => $log, 'lines' => $lines, 'filter' => $filter])]);
+        $filters = [
+            'time' => substr(trim((string) ($_GET['time'] ?? '')), 0, 100),
+            'user' => substr(trim((string) ($_GET['user'] ?? '')), 0, 64),
+            'event' => substr(trim((string) ($_GET['event'] ?? '')), 0, 120),
+            'ip' => substr(trim((string) ($_GET['ip'] ?? '')), 0, 64),
+        ];
+        render('logs', ['title' => 'Logs', 'nav' => 'logs', 'log' => $log, 'lines' => $lines,
+            'filters' => $filters,
+            'rows' => api('logs', ['log' => $log, 'lines' => $lines] + $filters)]);
     }
 } catch (ApiError $e) {
     http_response_code(500);

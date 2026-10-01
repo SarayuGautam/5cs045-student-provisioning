@@ -979,7 +979,7 @@ function redact_privileged_command(string $command): string {
  */
 function privileged_log(
     int $lines,
-    string $filter
+    array $filters
 ): array {
     $want = max(
         10,
@@ -1103,11 +1103,11 @@ function privileged_log(
         }
     }
 
-    if ($filter !== '') {
+    if (array_filter($filters, fn(string $v): bool => $v !== '')) {
         $events = array_values(array_filter(
             $events,
             fn(array $event): bool =>
-                stripos($event['line'], $filter) !== false
+                log_line_matches_filters($event['line'], $filters)
         ));
     }
 
@@ -1550,15 +1550,61 @@ function bans(): array {
     return $out;
 }
 
+
+function log_line_fields(string $line): array {
+    $time = '';
+    $ip = '';
+    $user = '';
+    $event = trim($line);
+
+    if (preg_match(
+        '/^\\[([^\\]]+)\\]\\s*(?:\\[([^\\]]+)\\]\\s*)?([^:]+):\\s*(.*)$/',
+        $line,
+        $m
+    )) {
+        $time = trim($m[1]);
+        $ip = trim((string) ($m[2] ?? ''));
+        $user = trim($m[3]);
+        $event = trim($m[4]);
+    }
+
+    return [
+        'time' => $time,
+        'user' => $user,
+        'event' => $event,
+        'ip' => $ip
+    ];
+}
+
+function log_line_matches_filters(string $line, array $filters): bool {
+    $fields = log_line_fields($line);
+
+    foreach ($filters as $key => $needle) {
+        $needle = trim($needle);
+
+        if ($needle === '') {
+            continue;
+        }
+
+        $value = $fields[$key] ?? '';
+
+        if (stripos($value, $needle) === false) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 function tail_log(
     string $which,
     int $lines,
-    string $filter
+    array $filters
 ): array {
     if ($which === 'privileged') {
         return privileged_log(
             $lines,
-            $filter
+            $filters
         );
     }
 
@@ -1574,7 +1620,7 @@ function tail_log(
         '-n',
         (string) max(
             10,
-            min($lines, 2000)
+            min($lines * 8, 10000)
         ),
         $file
     ]);
@@ -1587,19 +1633,19 @@ function tail_log(
             ),
             fn($l) =>
                 $l !== '' &&
-                (
-                    $filter === '' ||
-                    stripos(
-                        $l,
-                        $filter
-                    ) !== false
+                log_line_matches_filters(
+                    $l,
+                    $filters
                 )
         )
     );
 
-    return array_reverse($rows);
+    return array_slice(
+        array_reverse($rows),
+        0,
+        max(10, min($lines, 2000))
+    );
 }
-
 // ---------------------------------------------------------------------------------------------
 // Allowlist of addresses that may open the panel
 
@@ -2914,10 +2960,12 @@ switch ($action) {
                     'lines',
                     '300'
                 ),
-                arg(
-                    $args,
-                    'filter'
-                )
+                [
+                    'time' => arg($args, 'time'),
+                    'user' => arg($args, 'user'),
+                    'event' => arg($args, 'event'),
+                    'ip' => arg($args, 'ip')
+                ]
             )
         );
 
