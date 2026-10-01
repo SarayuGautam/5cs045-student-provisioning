@@ -31,6 +31,24 @@ function registration_key(string $email): string {
     return hash('sha256', strtolower($email));
 }
 
+// Students' websites are served only on this name (templates/nginx-students.conf). Any other
+// address, the server's IP included, just sends the browser here.
+const STUDENT_SITE_URL = 'https://fullstack-student.heraldcollege.edu.np';
+
+// An address from smtp_config.php for an email, or $default when it is missing or an IP address.
+// Emails always give the name: a private IP means nothing off campus, and server_url on older
+// servers still holds the IP from before the names existed.
+function configured_url(array $config, string $key, string $default): string {
+    $url = rtrim(trim((string) ($config[$key] ?? '')), '/');
+    $host = trim((string) parse_url($url, PHP_URL_HOST), '[]');
+    return ($host === '' || filter_var($host, FILTER_VALIDATE_IP) !== false) ? $default : $url;
+}
+
+// The students' websites, as the login emails, the panel and add-student.sh give them
+function student_site_url(array $config): string {
+    return configured_url($config, 'server_url', STUDENT_SITE_URL);
+}
+
 // The first email: a one-time link that proves the student can read this mailbox (see registration.php)
 function signup_link_email_body(string $username, string $link): string {
     return <<<TXT

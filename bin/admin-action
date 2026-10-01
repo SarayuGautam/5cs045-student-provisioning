@@ -127,8 +127,13 @@ function send_credentials(string $user, string $email): ?string {
     if ($password === null) {
         return 'No saved password for this student. Reset the password first.';
     }
-    $url = (string) (smtp()['server_url'] ?? '');
-    return send_mail($email, 'Your Server Credentials', credentials_email_body($user, $password, $url));
+    return send_mail($email, 'Your Server Credentials', credentials_email_body($user, $password, site_url()));
+}
+
+/** The students' websites, as the login emails give them: their name, never an IP address. */
+function site_url(): string {
+    require_once WEB_LIB . '/credentials.php';
+    return student_site_url(smtp());
 }
 
 function saved_password(string $user): ?string {
@@ -425,7 +430,7 @@ function health(): array {
         'sessions' => $lcode === 0 ? count(array_filter(explode("\n", trim($lout)))) : null,
         'quotas_on' => quotas_on(),
         'admin_email' => (string) ($c['admin_email'] ?? ''),
-        'server_url' => (string) ($c['server_url'] ?? ''),
+        'server_url' => site_url(),
         'students' => count(student_names()),
         'online' => count(array_intersect_key(online_users(), student_names())),
     ];
@@ -658,7 +663,7 @@ switch ($action) {
                 $row['has_saved_password'] = saved_password($user) !== null;
                 $row['db_limit_mb'] = DB_LIMIT_MB;
                 $row['default_quota_mb'] = DEFAULT_QUOTA_MB;
-                $row['server_url'] = rtrim((string) (smtp()['server_url'] ?? ''), '/');
+                $row['server_url'] = site_url();
                 reply($row);
             }
         }
@@ -740,7 +745,7 @@ switch ($action) {
     case 'settings':
         $c = smtp();
         reply([
-            'server_url' => rtrim((string) ($c['server_url'] ?? ''), '/'),
+            'server_url' => site_url(),
             'admin_email' => (string) ($c['admin_email'] ?? ''),
             'email_domain' => (string) ($c['allowed_email_domain'] ?? ''),
             'smtp_ready' => ($c['host'] ?? '') !== '' && !str_contains((string) ($c['host'] ?? ''), 'example'),

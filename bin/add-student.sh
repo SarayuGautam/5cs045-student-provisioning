@@ -139,8 +139,9 @@ if [[ -n "$EMAIL" ]]; then
   chmod 600 "${REGISTRY_DIR}/${KEY}"
 fi
 
-SERVER_URL="$(php -r '$c = @include "/etc/5cs045/smtp_config.php"; echo rtrim((string) ($c["server_url"] ?? ""), "/");' 2>/dev/null || true)"
-SERVER_URL="${SERVER_URL:-https://<server>}"
+# The websites' address as the login emails give it: their name, never the server's IP address
+SERVER_URL="$(php -r 'require "/var/www/html/lib/credentials.php"; $c = @include "/etc/5cs045/smtp_config.php"; echo student_site_url(is_array($c) ? $c : []);' 2>/dev/null || true)"
+SERVER_URL="${SERVER_URL:-https://fullstack-student.heraldcollege.edu.np}"
 
 log "${USERNAME} is ready"
 echo ""

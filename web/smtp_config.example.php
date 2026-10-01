@@ -12,10 +12,11 @@ return [
     'from_name' => 'Server Admin',
     'use_starttls' => true,
     'allowed_email_domain' => 'example.edu',
-    'server_url' => 'https://server.example.edu',
-    // The sign-up page's address, for the link that confirms a student's email.
-    // Without this line, https://fullstack.heraldcollege.edu.np is used.
-    'signup_url' => 'https://signup.example.edu',
+    // The students' websites, for the login email, and the sign-up page, for the link that confirms
+    // a student's email. Emails always give a name: an IP address here is ignored, and without these
+    // lines the two addresses below are used.
+    'server_url' => 'https://fullstack-student.heraldcollege.edu.np',
+    'signup_url' => 'https://fullstack.heraldcollege.edu.np',
     // Where server alerts go (for example "disk 80% full"). Leave empty for no alerts.
     'admin_email' => '',
 ];

@@ -108,8 +108,8 @@ Then do these three things.
 | `from_address`, `from_name` | What students see as the sender |
 | `use_starttls` | Keep `true` for port 587 |
 | `allowed_email_domain` | Only emails ending in this can sign up, for example `heraldcollege.edu.np` |
-| `server_url` | The address of the student websites, used in the login email: `https://fullstack-student.heraldcollege.edu.np` (the student guide uses this address) |
-| `signup_url` | The sign-up page's address, used in the link students click to create their account. Leave it out to use `https://fullstack.heraldcollege.edu.np` |
+| `server_url` | The address of the student websites, used in the login email. Leave it out to use `https://fullstack-student.heraldcollege.edu.np` (the address in the student guide). An IP address here is ignored, because the websites only answer on their name. |
+| `signup_url` | The sign-up page's address, used in the link students click to create their account. Leave it out to use `https://fullstack.heraldcollege.edu.np`. An IP address is ignored here too. |
 | `admin_email` | Where server alerts go (disk nearly full, login service restarted). Empty means no alerts. |
 
 This file is never in Git; never put the real password anywhere else. Test it on the panel: **Security → Send a test email**.

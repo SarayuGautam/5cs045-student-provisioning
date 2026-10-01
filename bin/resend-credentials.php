@@ -50,7 +50,7 @@ try {
         fromName: (string) $smtp['from_name'],
         useStartTls: (bool) $smtp['use_starttls'],
     );
-    $mailer->send($email, 'Your Server Credentials', credentials_email_body($username, $m[1], (string) $smtp['server_url']));
+    $mailer->send($email, 'Your Server Credentials', credentials_email_body($username, $m[1], student_site_url($smtp)));
 } catch (Throwable $e) {
     fwrite(STDERR, "Email failed: {$e->getMessage()}\n");
     exit(1);

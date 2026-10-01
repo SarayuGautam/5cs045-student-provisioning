@@ -54,12 +54,6 @@ if (id_exists($username)) {
     respond_and_redirect(false, 'An account already exists for this student. Please contact your tutor.');
 }
 
-$serverUrl = (string) ($smtp['server_url'] ?? '');
-if ($serverUrl === '') {
-    audit_log('FAILURE server_url is not set in /etc/5cs045/smtp_config.php');
-    respond_and_redirect(false, 'Something went wrong. Please contact your tutor.');
-}
-
 $cmd = sprintf('sudo -n %s -d -u %s 2>&1', escapeshellarg(ADD_STUDENT_SCRIPT), escapeshellarg($username));
 exec($cmd, $outputLines, $exitCode);
 $output = implode("\n", $outputLines);
@@ -84,7 +78,7 @@ if (!preg_match('/^Password:\s+(\S+)/m', $output, $m)) {
 }
 
 try {
-    smtp_mailer($smtp)->send($email, 'Your Server Credentials', credentials_email_body($username, $m[1], $serverUrl));
+    smtp_mailer($smtp)->send($email, 'Your Server Credentials', credentials_email_body($username, $m[1], student_site_url($smtp)));
 } catch (Throwable $e) {
     audit_log("PASSWORD EMAIL FAILED for {$username}: " . $e->getMessage());
     respond_and_redirect(false, 'Your account is ready, but the email with your password did not send. Please ask your tutor to send it again.');

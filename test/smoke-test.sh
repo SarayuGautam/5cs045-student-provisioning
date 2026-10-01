@@ -179,6 +179,13 @@ echo "=== public registration and phpMyAdmin ==="
 check_code "$BASE_URL/" "200" "registration page is public at the site root"
 check_code "$BASE_URL/register.php" "301" "old /register.php URL redirects to the new site root"
 check_code "$BASE_URL/phpmyadmin/" "200" "phpMyAdmin login page loads directly (no Basic Auth prompt)"
+# Login details (emails, the panel, add-student.sh) give the websites' name: a private IP means
+# nothing off campus, and student websites only answer on their name anyway.
+SITE_HOST=""
+[[ "$OUT_A" =~ Workshops:\ +https://([^/]+)/ ]] && SITE_HOST="${BASH_REMATCH[1]}"
+[[ -n "$SITE_HOST" && ! "$SITE_HOST" =~ ^[0-9.]+(:[0-9]+)?$ && "$SITE_HOST" != \[* ]] \
+  && ok "login details give the websites as ${SITE_HOST}, not an IP address" \
+  || bad "login details give the websites as '${SITE_HOST}' instead of their name"
 # name+1@ reaches the same inbox as name@, so sign-up must refuse it, or one student could make as
 # many accounts as they like. The address is refused before anything is created or emailed.
 DOMAIN="$(php -r '$c = @include "/etc/5cs045/smtp_config.php"; echo (string) ($c["allowed_email_domain"] ?? "");' 2>/dev/null)"

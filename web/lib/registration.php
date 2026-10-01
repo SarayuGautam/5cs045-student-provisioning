@@ -13,6 +13,7 @@ declare(strict_types=1);
 // Step 2 is a button, not the link itself, because some mail scanners open every link they see.
 
 require_once __DIR__ . '/smtp_mailer.php';
+require_once __DIR__ . '/credentials.php';
 
 const LOG_FILE = '/var/log/5cs045-registration.log';
 const RATE_LIMIT_DIR = '/var/lib/5cs045-ratelimit';
@@ -103,8 +104,7 @@ function forget_recent_request(string $email): void {
 // The sign-up page's address, for the link in the email. It comes from the settings and never from
 // the request, so a forged Host header cannot point a student's link at someone else's website.
 function signup_url(array $smtp): string {
-    $url = rtrim(trim((string) ($smtp['signup_url'] ?? '')), '/');
-    return $url !== '' ? $url : DEFAULT_SIGNUP_URL;
+    return configured_url($smtp, 'signup_url', DEFAULT_SIGNUP_URL);
 }
 
 function smtp_mailer(array $smtp): SmtpMailer {
