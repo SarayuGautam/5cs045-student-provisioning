@@ -403,13 +403,29 @@ input[type="search"]::-webkit-search-cancel-button { appearance: none; -webkit-a
 .filter { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
 .filter .finder { flex: 1 1 300px; }
 .filter .btn { height: 46px; }
-.log-list { font-size: 0.95rem; }
-.log-list li { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr) auto; gap: 16px; padding: 9px 0; align-items: baseline; }
-.log-list li + li { border-top: 1px solid var(--line); }
-.log-list time { color: var(--ink-2); font-size: 0.875rem; white-space: nowrap; }
-.log-text { overflow-wrap: anywhere; }
-.log-addr { color: var(--ink-2); font-size: 0.85rem; }
-.log-list .is-bad .log-text { color: var(--red-ink); font-weight: 600; }
+.log-filter-form { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin: 0 0 16px; flex-wrap: wrap; }
+.log-filter-form select { min-width: 150px; }
+.btn-quiet { background: transparent; color: var(--ink-2); border: 1px solid var(--line); text-decoration: none; }
+.log-filter-spacer { flex: 1 1 200px; }
+.log-table-wrap { border: 1px solid var(--line); border-radius: var(--r-surface); overflow: auto; background: var(--bg-2); }
+.log-table { width: 100%; border-collapse: collapse; min-width: 760px; font-size: 0.92rem; }
+.log-table th, .log-table td { padding: 13px 15px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+.log-table thead th { background: var(--bg-3); color: var(--ink-2); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+.log-table tbody tr:last-child td { border-bottom: 0; }
+.log-table tbody tr:hover { background: color-mix(in srgb, var(--bg-3) 55%, transparent); }
+.log-filter-row th { padding: 8px 10px; background: var(--bg-2); text-transform: none; letter-spacing: 0; }
+.log-filter-row input { width: 100%; min-width: 0; height: 38px; padding: 0 10px; font: 0.84rem var(--mono); border: 1px solid var(--line); border-radius: var(--r-control); background: var(--bg); color: var(--ink); }
+.log-time { white-space: nowrap; color: var(--ink-2); font-size: 0.86rem; }
+.log-user, .log-ip { white-space: nowrap; }
+.log-event { min-width: 340px; }
+.log-badge { display: inline-flex; align-items: center; margin-right: 9px; padding: 4px 7px; border-radius: 999px; font: 700 0.68rem/1 var(--mono); letter-spacing: 0.04em; background: var(--bg-3); color: var(--ink-2); vertical-align: middle; }
+.log-badge-bad { background: var(--red-bg); color: var(--red-ink); }
+.log-badge-ssh { background: var(--bg-3); color: var(--ink); }
+.log-badge-sudo { background: var(--bg-3); color: var(--ink); }
+.log-badge-login { background: var(--bg-3); color: var(--ink); }
+.log-badge-account { background: var(--bg-3); color: var(--ink); }
+.log-details { overflow-wrap: anywhere; color: var(--ink); }
+.log-table tbody tr.is-bad .log-details { color: var(--red-ink); font-weight: 600; }
 
 .log-panel { border: 1px solid var(--line); border-radius: var(--r-surface); background: var(--bg-2); overflow: hidden; }
 .log-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 12px 12px 20px; border-bottom: 1px solid var(--line); }
@@ -430,6 +446,9 @@ input[type="search"]::-webkit-search-cancel-button { appearance: none; -webkit-a
 /* ---------- Small screens ---------- */
 
 @media (max-width: 900px) {
+  .log-table { min-width: 680px; }
+  .log-event { min-width: 280px; }
+  .log-filter-spacer { flex-basis: 120px; }
   .topbar { flex-wrap: wrap; height: auto; gap: 0 16px; padding: 10px 16px 0; }
   .nav { order: 3; width: 100%; overflow-x: auto; scrollbar-width: none; margin: 6px -10px 0; padding-bottom: 6px; gap: 0; }
   .nav a { padding: 8px 9px; white-space: nowrap; }
@@ -469,3 +488,9 @@ input[type="search"]::-webkit-search-cancel-button { appearance: none; -webkit-a
   .state-running::before, .btn.is-busy::after { animation-duration: 2.4s; }
 }
 @keyframes fade { from { opacity: 0; } }
+
+@media (max-width: 680px) {
+  .log-filter-form { justify-content: stretch; }
+  .log-filter-form > * { flex: 1 1 100%; }
+  .log-filter-form .log-filter-spacer { display: none; }
+}
