@@ -246,21 +246,21 @@ ANSWER="$(echo '{"action":"students","ip":"127.0.0.1","token":"'"$(printf '0%.0s
 su -s /bin/bash www-data -c "sudo -n $DEPLOY_ROOT/bin/admin-action </dev/null" >/dev/null 2>&1 \
   && bad "www-data (the public website) can run the panel's server tools" \
   || ok "the public website cannot run the panel's server tools"
-# A 5cs045-panel account (for example a VAPT tester) can use the panel but must NOT have sudo.
-if getent group 5cs045-panel >/dev/null; then
-  SMOKE_PANEL_PW="$(openssl rand -base64 12)"
-  useradd -m -s /bin/bash smoketest_panel 2>/dev/null
-  echo "smoketest_panel:${SMOKE_PANEL_PW}" | chpasswd
-  usermod -aG 5cs045-panel smoketest_panel
-  LOGIN="$(echo '{"action":"login","ip":"127.0.0.1","args":{"username":"smoketest_panel","password":"'"${SMOKE_PANEL_PW}"'"}}' | "$DEPLOY_ROOT/bin/admin-action" 2>/dev/null)"
-  [[ "$LOGIN" == *'"token"'* ]] && ok "a 5cs045-panel account can sign in to the panel" \
-    || bad "a 5cs045-panel account could not sign in to the panel: ${LOGIN:0:80}"
-  su -s /bin/bash smoketest_panel -c 'sudo -n true' >/dev/null 2>&1 \
-    && bad "a 5cs045-panel account has sudo (it must not)" \
-    || ok "a 5cs045-panel account has no sudo on the server"
-  userdel -r smoketest_panel >/dev/null 2>&1
-  rm -f /var/lib/5cs045-admin-auth/fails-user-* /var/lib/5cs045-admin-auth/fails-ip-*
-fi
+# A role-granted non-student account can use the panel but must NOT have sudo.
+SMOKE_PANEL_PW="$(openssl rand -base64 12)"
+useradd -m -s /bin/bash smoketest_panel 2>/dev/null
+echo "smoketest_panel:${SMOKE_PANEL_PW}" | chpasswd
+printf 'smoketest_panel\n' >> /var/lib/5cs045-admin-auth/admin-users
+LOGIN="$(echo '{"action":"login","ip":"127.0.0.1","args":{"username":"smoketest_panel","password":"'${SMOKE_PANEL_PW}'"}}' | "$DEPLOY_ROOT/bin/admin-action" 2>/dev/null)"
+[[ "$LOGIN" == *'"token"'* && "$LOGIN" == *'"role":"admin"'* ]]   && ok "an explicitly granted non-student account can sign in to the panel as admin"   || bad "an explicitly granted non-student account could not sign in as admin: ${LOGIN:0:120}"
+su -s /bin/bash smoketest_panel -c 'sudo -n true' >/dev/null 2>&1   && bad "a panel admin account has sudo (it must not)"   || ok "a panel admin account has no sudo on the server"
+printf '' > /var/lib/5cs045-admin-auth/admin-users
+userdel -r smoketest_panel >/dev/null 2>&1
+rm -f /var/lib/5cs045-admin-auth/fails-user-* /var/lib/5cs045-admin-auth/fails-ip-*
+echo ""
+echo "=== managed non-student account checks ==="
+CREATE_INPUT='{"action":"create-panel-account","ip":"127.0.0.1","token":"'"$(printf '0%.0s' {1..64})"'","args":{}}'
+[[ "$("$DEPLOY_ROOT/bin/admin-action" <<< "$CREATE_INPUT" 2>/dev/null)" == *"SESSION_EXPIRED"* ]]   && ok "managed-account creation requires a signed-in session"   || bad "managed-account creation accepted an unsigned request"
 
 echo ""
 echo "=== cleaning up test accounts ==="
