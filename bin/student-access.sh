@@ -72,7 +72,8 @@ ensure_dirs() {
 }
 
 write_week_index() {
-  local user="$1" week="$2" dir="${STUDENT_ROOT}/$user/workshops/week$week"
+  local user="$1" week="$2"
+  local dir="${STUDENT_ROOT}/$user/workshops/week$week"
   [[ -f "$dir/index.php" || -f "$dir/index.html" ]] && return 0
   cat > "$dir/index.html" <<PAGE
 <!doctype html>
@@ -163,7 +164,7 @@ area_is_open() {
 }
 
 default_workshop_weeks() {
-  local user="$1" home="@@{STUDENT_ROOT}/$user" dir name n max=1
+  local user="$1" home="${STUDENT_ROOT}/$user" dir name n max=1
   shopt -s nullglob
   for dir in "$home"/workshops/week*/; do
     name="$(basename "$dir")"
