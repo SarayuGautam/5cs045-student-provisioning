@@ -94,7 +94,11 @@ function credentials_email_body(
         "-----------------------------\n" .
         "Username: {$username}\n" .
         "Password: {$password}\n" .
-        "Database: {$username}\n" .\n        "SSH/SCP port: 22\n" .\n        "Workshop uploads: ~/workshops/weekN/\n" .\n        "Exam/Assessment access: your tutor opens these folders when they are available.\n" .\n        "Do not upload directly to ~/ or ~/workshops/.\n\n" .
+        "Database: {$username}\n" .
+        "SSH/SCP port: 22\n" .
+        "Workshop uploads: ~/workshops/weekN/\n" .
+        "Exam/Assessment access: your tutor opens these folders when they are available.\n" .
+        "Do not upload directly to ~/ or ~/workshops/.\n\n" .
         "Your website:\n" .
         "{$site}\n\n" .
         "Server Access Guide:\n" .
