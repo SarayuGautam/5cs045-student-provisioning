@@ -206,7 +206,6 @@ TOKEN="$("${CURL[@]}" -c "$JAR" -b "$JAR" "$BASE_URL/" 2>/dev/null | sed -n '/na
 "${CURL[@]}" -c "$JAR" -b "$JAR" -o /dev/null --data-urlencode "csrf_token=${TOKEN}" \
   --data-urlencode "full_name=Smoke Test Plus" \
   --data-urlencode "email=smoketest.plus+1@${DOMAIN:-heraldcollege.edu.np}" "$BASE_URL/register_handler.php" 2>/dev/null
-PAGE="$("${CURL[@]}" -c "$JAR" -b "$JAR" "$BASE_URL/" 2>/dev/null)"
 rm -f "$JAR"
 [[ "$PAGE" == *"with nothing added to it"* ]] \
   && ok "sign-up refuses name+1@ addresses, which reach the same inbox as name@" \
