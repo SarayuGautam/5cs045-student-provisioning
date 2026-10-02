@@ -218,6 +218,7 @@ form {
     text-align: center;
 }
 
+input[type="text"],
 input[type="email"] {
     width: 100%;
     height: 56px;
@@ -234,11 +235,13 @@ input[type="email"] {
         box-shadow .15s ease;
 }
 
+input[type="text"]::placeholder,
 input[type="email"]::placeholder {
     color: #a4aab3;
     font-weight: 400;
 }
 
+input[type="text"]:focus,
 input[type="email"]:focus {
     border-color: var(--green);
     box-shadow: 0 0 0 4px rgba(114, 191, 61, 0.14);
@@ -376,6 +379,7 @@ button.loading .spinner {
         letter-spacing: 0.006em;
     }
 
+    input[type="text"],
     input[type="email"],
     button {
         height: 52px;
@@ -465,6 +469,25 @@ button.loading .spinner {
                         value="<?= $e($_SESSION['register_csrf']) ?>"
                     >
 
+                    <label class="field-label" for="full_name">
+                        Student's name
+                    </label>
+
+                    <input
+                        id="full_name"
+                        name="full_name"
+                        type="text"
+                        required
+                        maxlength="100"
+                        autocomplete="name"
+                        placeholder="Your full name"
+                        autofocus
+                    >
+
+                    <label class="field-label" for="email">
+                        College email address
+                    </label>
+
                     <input
                         id="email"
                         name="email"
@@ -473,7 +496,6 @@ button.loading .spinner {
                         maxlength="254"
                         autocomplete="email"
                         placeholder="yourname@heraldcollege.edu.np"
-                        autofocus
                     >
 
                     <button type="submit" id="submitBtn">
