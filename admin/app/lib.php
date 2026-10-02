@@ -249,31 +249,6 @@ function folder_datetime_label(int $timestamp): string {
         ->format('j M Y, H:i');
 }
 
-function panel_timezone(): DateTimeZone {
-    static $tz;
-    return $tz ??= new DateTimeZone('Asia/Kathmandu');
-}
-
-function folder_datetime_input(int $timestamp): string {
-    if ($timestamp <= 0) {
-        return '';
-    }
-
-    return (new DateTimeImmutable('@' . $timestamp))
-        ->setTimezone(panel_timezone())
-        ->format('Y-m-d\\TH:i');
-}
-
-function folder_datetime_label(int $timestamp): string {
-    if ($timestamp <= 0) {
-        return '';
-    }
-
-    return (new DateTimeImmutable('@' . $timestamp))
-        ->setTimezone(panel_timezone())
-        ->format('j M Y, H:i');
-}
-
 function fmt_date(?string $iso): string {
     if ($iso === null || $iso === '' || ($t = strtotime($iso)) === false) return '';
     return date('j M Y, H:i', $t);
