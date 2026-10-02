@@ -251,7 +251,7 @@ get_user() {
   local user="$1" file
   valid_user "$user"
   file="$(policy_file "$user")"
-  echo "workshop_weeks=$(policy_value WORKSHOP_WEEKS "$file" "$(default_workshop_weeks "$user")")"
+  echo "workshop_weeks=$WORKSHOP_FOLDER_COUNT"
   echo "exam_mode=$(policy_value EXAM_MODE "$file" "$(default_area_mode "$user" exam)")"
   echo "exam_at=$(policy_value EXAM_AT "$file" 0)"
   echo "assessment_mode=$(policy_value ASSESSMENT_MODE "$file" "$(default_area_mode "$user" assessment)")"
