@@ -10,14 +10,19 @@ USERNAME_RE='^[a-z][a-z0-9_]{2,31}$'
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || die "run this as root"
-[[ $# -eq 2 ]] || die "Usage: $0 USER workshops|exam|assessment"
+[[ $# -eq 2 ]] || die "Usage: $0 USER workshops|weekN|exam|assessment"
 USER="$1"
 AREA="$2"
 [[ "$USER" =~ $USERNAME_RE ]] || die "invalid username"
 id "$USER" >/dev/null 2>&1 || die "no such student: $USER"
 HOME_DIR="$STUDENT_ROOT/$USER"
 [[ -d "$HOME_DIR" ]] || die "no student home: $USER"
-case "$AREA" in workshops|exam|assessment) ;; *) die "unknown folder: $AREA" ;; esac
+if [[ "$AREA" =~ ^week([0-9]+)$ ]]; then
+  WEEK="${BASH_REMATCH[1]}"
+  case "$WEEK" in 1|2|3|4|5|6|8|9|10|11|12) ;; *) die "unknown workshop week: $AREA" ;; esac
+elif [[ "$AREA" != "workshops" && "$AREA" != "exam" && "$AREA" != "assessment" ]]; then
+  die "unknown folder: $AREA"
+fi
 
 write_index() {
   local dir="$1" title="$2" text="$3"
@@ -63,6 +68,9 @@ case "$AREA" in
     for week in "${FIXED_WORKSHOP_WEEKS[@]}"; do
       clear_dir "$HOME_DIR/workshops/week$week" "Week $week" "Upload this week's workshop files here."
     done
+    ;;
+  week*)
+    clear_dir "$HOME_DIR/workshops/week$WEEK" "Week $WEEK" "Upload this week's workshop files here."
     ;;
   exam)
     clear_dir "$HOME_DIR/exam" "Exam" "Your exam folder is ready for your exam work."
