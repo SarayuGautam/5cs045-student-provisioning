@@ -210,14 +210,6 @@ form {
     margin: 0 auto;
 }
 
-.field-label {
-    display: block;
-    margin-bottom: 9px;
-    font-size: 13px;
-    font-weight: 600;
-    text-align: center;
-}
-
 input[type="text"]#full_name {
     margin-top: 24px;
 }
@@ -251,7 +243,6 @@ input[type="email"]::placeholder {
 
 input[type="text"]:focus,
 input[type="email"]:focus {
-    margin-top: 0;
     border-color: var(--green);
     box-shadow: 0 0 0 4px rgba(114, 191, 61, 0.14);
 }
