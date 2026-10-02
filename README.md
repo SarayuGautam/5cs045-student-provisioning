@@ -18,7 +18,7 @@ A server for the Full Stack Development module. Every student gets their own log
 - **A login.** One password for SSH, SCP and phpMyAdmin/MySQL.
 - **A database** with the same name as their username.
 - **Three websites** on `https://fullstack-student.heraldcollege.edu.np`:
-  - `/~<username>/workshops/` for weekly work, one folder per week.
+  - `/~<username>/workshops/` for weekly work: week1-week6 and week8-week12 (11 managed folders).
   - `/~<username>/assessment/` for the assessment project.
   - `/~<username>/exam/` for the exam.
 - **Limits:** 500 MB of disk space and a 100 MB database (see "Limits").
