@@ -203,9 +203,9 @@ SITE_HOST=""
 DOMAIN="$(php -r '$c = @include "/etc/5cs045/smtp_config.php"; echo (string) ($c["allowed_email_domain"] ?? "");' 2>/dev/null)"
 JAR="$(mktemp)"
 TOKEN="$("${CURL[@]}" -c "$JAR" -b "$JAR" "$BASE_URL/" 2>/dev/null | sed -n '/name="csrf_token"/{n;s/.*value="\([0-9a-f]*\)".*/\1/p;q}')"
-"${CURL[@]}" -c "$JAR" -b "$JAR" -o /dev/null --data-urlencode "csrf_token=${TOKEN}" \
+PAGE="$("${CURL[@]}" -c "$JAR" -b "$JAR" -L --data-urlencode "csrf_token=${TOKEN}" \
   --data-urlencode "full_name=Smoke Test Plus" \
-  --data-urlencode "email=smoketest.plus+1@${DOMAIN:-heraldcollege.edu.np}" "$BASE_URL/register_handler.php" 2>/dev/null
+  --data-urlencode "email=smoketest.plus+1@${DOMAIN:-heraldcollege.edu.np}" "$BASE_URL/register_handler.php" 2>/dev/null)"
 rm -f "$JAR"
 [[ "$PAGE" == *"with nothing added to it"* ]] \
   && ok "sign-up refuses name+1@ addresses, which reach the same inbox as name@" \
