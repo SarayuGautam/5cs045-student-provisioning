@@ -9,7 +9,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY_ROOT="/usr/local/sbin/5cs045"
 
-install -d "${DEPLOY_ROOT}/bin" "${DEPLOY_ROOT}/templates" /var/www/html/lib
+install -d "${DEPLOY_ROOT}/bin" "${DEPLOY_ROOT}/templates" "${DEPLOY_ROOT}/test" /var/www/html/lib
+install -o root -g root -m 750 "${REPO_ROOT}/test/smoke-test.sh" "${DEPLOY_ROOT}/test/smoke-test.sh"
 # Each script is replaced in one step, so a student login during the update never finds a
 # half-copied wrapper. Every student SSH session runs the two 755 ones (templates/sshd-students.conf).
 for f in "${REPO_ROOT}"/bin/*; do
