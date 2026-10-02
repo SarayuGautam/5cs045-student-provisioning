@@ -39,7 +39,7 @@ $folderSummary = sprintf(
       <?php if ($s['online']): ?><span class="online">Signed in now</span><?php endif; ?>
         </p>
       </div>
-      <a class="btn btn-small manage-link" href="/students/<?= h($u) ?>/manage"><?= icon('settings') ?><span>Open full manager</span></a>
+      <a class="btn btn-small manage-link" href="/students/<?= h($u) ?>/manage"><?= icon('server') ?><span>Open full manager</span></a>
     </div>
     <?php if ($s['email']): ?><p class="muted"><?= h($s['email']) ?></p><?php endif; ?>
   </header>
