@@ -540,7 +540,7 @@ input[type="search"]::-webkit-search-cancel-button { appearance: none; -webkit-a
 .week-clear { width:100%; display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 10px; border:0; border-top:1px solid var(--line); background:transparent; color:var(--red-ink); cursor:pointer; font:600 .82rem/1 var(--font); }
 .week-clear:hover { background:var(--red-wash); }
 .student-manage > .panel-body { padding:0; }
-.student-manage > .panel-body > .back { margin-bottom:28px; }
+.student-manage > .panel-body > .back { display:none; }
 .student-manage .panel-body { background:transparent; }
 .student-manage .add-student-inline { margin-top:24px; }
 @media (max-width:1000px) {
