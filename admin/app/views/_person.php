@@ -7,7 +7,7 @@ $dbPct = percent($s['db_mb'], $s['db_limit_mb']);
 $base = $s['server_url'];
 $pw = ($secret && $secret['username'] === $u) ? (string) ($secret['password'] ?? '') : '';
 $access = $s['folder_access'] ?? [
-  'workshop_weeks' => 1,
+  'workshop_weeks' => 11,
   'exam' => ['mode' => 'open', 'at' => 0],
   'assessment' => ['mode' => 'open', 'at' => 0],
 ];
@@ -19,8 +19,7 @@ $folderModeLabel = static function (array $area): string {
   return $area['mode'] === 'locked' ? 'locked' : 'open';
 };
 $folderSummary = sprintf(
-  'Workshops: weeks 1–%d. Exam: %s. Assessment: %s.',
-  (int) $access['workshop_weeks'],
+  'Workshops: weeks 1–6 and 8–12. Exam: %s. Assessment: %s.',
   $folderModeLabel($access['exam']),
   $folderModeLabel($access['assessment'])
 );
@@ -39,6 +38,30 @@ $folderSummary = sprintf(
     </p>
     <?php if ($s['email']): ?><p class="muted"><?= h($s['email']) ?></p><?php endif; ?>
   </header>
+
+  <details class="fix add-student-inline">
+    <summary><?= icon('plus') ?><span><strong>Add another student</strong><small>Create a student account while staying on this student.</small></span></summary>
+    <form method="post" action="/students" class="fix-form stack" id="add-form-inline" data-busy>
+      <?= csrf_field() ?>
+      <label class="field">
+        <span class="label">Their email</span>
+        <input type="email" name="email" placeholder="<?= h(($settings['email_domain'] ?? '') ? 'firstname.lastname@' . $settings['email_domain'] : 'name@example.edu') ?>" autocomplete="off" data-email-source>
+      </label>
+      <label class="field">
+        <span class="label">Username</span>
+        <input name="username" pattern="[a-z][a-z0-9_]{2,31}" autocapitalize="off" spellcheck="false" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="label">Full name</span>
+        <input name="full_name" autocomplete="off">
+      </label>
+      <label class="check">
+        <input type="checkbox" name="send_email" value="1" checked>
+        <span>Email them their login</span>
+      </label>
+      <div class="row"><button type="submit" class="btn btn-primary" data-busy-text="Creating…"><?= icon('plus') ?><span>Create account</span></button></div>
+    </form>
+  </details>
 
   <?php if ($pw !== ''): ?>
     <section class="secret" aria-labelledby="secret-title">
@@ -134,14 +157,9 @@ $folderSummary = sprintf(
   <div class="fixes fixes-quiet">
     <details class="fix">
       <summary><?= icon('server') ?><span><strong>Folder access</strong><small><?= h($folderSummary) ?></small></span></summary>
+      <p class="small muted">Workshop folders are fixed at <span class="mono">week1–week6</span> and <span class="mono">week8–week12</span>. Exam and Assessment can be opened, locked, or scheduled below.</p>
       <form method="post" action="/students/<?= h($u) ?>/folders" class="fix-form" data-busy>
         <?= csrf_field() ?>
-
-        <label class="field">
-          <span class="label">Workshop folders through week</span>
-          <input type="number" name="workshop_weeks" min="1" max="52" value="<?= (int) $access['workshop_weeks'] ?>" required inputmode="numeric">
-          <span class="hint">Creates <span class="mono">week1</span> through <span class="mono">weekN</span>. Existing files are not deleted.</span>
-        </label>
 
         <label class="field">
           <span class="label">Exam access</span>
@@ -150,13 +168,12 @@ $folderSummary = sprintf(
               <option value="<?= h($value) ?>"<?= $access['exam']['mode'] === $value ? ' selected' : '' ?>><?= h($label) ?></option>
             <?php endforeach; ?>
           </select>
-          <span class="hint">Locked means the student cannot enter or upload. Scheduled times use Nepal time.</span>
+          <span class="hint">Scheduled times use Nepal time.</span>
         </label>
 
         <label class="field">
           <span class="label">Exam opens at</span>
           <input type="datetime-local" name="exam_at" value="<?= h(folder_datetime_input((int) $access['exam']['at'])) ?>">
-          <span class="hint">Used only when Exam access is scheduled.</span>
         </label>
 
         <label class="field">
@@ -166,17 +183,25 @@ $folderSummary = sprintf(
               <option value="<?= h($value) ?>"<?= $access['assessment']['mode'] === $value ? ' selected' : '' ?>><?= h($label) ?></option>
             <?php endforeach; ?>
           </select>
-          <span class="hint">Locked means the student cannot enter or upload. Scheduled times use Nepal time.</span>
+          <span class="hint">Scheduled times use Nepal time.</span>
         </label>
 
         <label class="field">
           <span class="label">Assessment opens at</span>
           <input type="datetime-local" name="assessment_at" value="<?= h(folder_datetime_input((int) $access['assessment']['at'])) ?>">
-          <span class="hint">Used only when Assessment access is scheduled.</span>
         </label>
 
         <div class="row"><button class="btn btn-primary" type="submit" data-busy-text="Saving…">Save folder access</button></div>
       </form>
+
+      <div class="folder-clear-grid">
+        <?php foreach (['workshops' => 'Workshops', 'assessment' => 'Assessment', 'exam' => 'Exam'] as $folder => $label): ?>
+          <form method="post" action="/students/<?= h($u) ?>/clear/<?= h($folder) ?>" data-busy data-confirm-action="<?= h("Clear {$label} for {$u}? This deletes the files in that folder and cannot be undone.") ?>">
+            <?= csrf_field() ?>
+            <button class="btn btn-danger" type="submit" data-busy-text="Clearing…"><?= icon('trash') ?><span>Clear <?= h($label) ?></span></button>
+          </form>
+        <?php endforeach; ?>
+      </div>
     </details>
 
     <details class="fix">
