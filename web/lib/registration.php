@@ -43,7 +43,7 @@ function already_registered(string $email): bool {
     return is_file(REGISTRY_DIR . '/' . registration_key($email));
 }
 
-function mark_registered(string $email, string $username, string $status = 'complete'): void {
+function mark_registered(string $email, string $username, string $status = 'complete', string $fullName = ''): void {
     @mkdir(REGISTRY_DIR, 0700, true);
     $path = REGISTRY_DIR . '/' . registration_key($email);
     $content = json_encode([
@@ -51,6 +51,7 @@ function mark_registered(string $email, string $username, string $status = 'comp
         'registered_at' => date(DATE_ATOM),
         'status' => $status,
         'email' => strtolower($email),
+        'full_name' => $fullName,
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     if ($content === false || @file_put_contents($path, $content, LOCK_EX) === false) {
         throw new RuntimeException('Could not record the registration.');
@@ -125,12 +126,13 @@ function signup_link_path(string $token): ?string {
     return preg_match('/^[0-9a-f]{64}$/', $token) ? SIGNUP_LINK_DIR . '/' . hash('sha256', $token) : null;
 }
 
-function create_signup_link(string $email, string $username): string {
+function create_signup_link(string $email, string $username, string $fullName = ''): string {
     $token = bin2hex(random_bytes(32));
     $path = signup_link_path($token);
     $record = json_encode([
         'email' => $email,
         'username' => $username,
+        'full_name' => $fullName,
         'expires' => time() + SIGNUP_LINK_SECONDS,
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     if ($record === false || @file_put_contents($path, $record, LOCK_EX) === false) {
@@ -140,7 +142,7 @@ function create_signup_link(string $email, string $username): string {
     return $token;
 }
 
-// The email and username a link was made for. Null if the link is unknown, used up or out of
+// The email, username and name a link was made for. Null if the link is unknown, used up or out of
 // date; $expired tells the last one apart, so the page can say so.
 function find_signup_link(string $token, ?bool &$expired = null): ?array {
     $expired = false;
@@ -150,6 +152,9 @@ function find_signup_link(string $token, ?bool &$expired = null): ?array {
     if (!is_array($record) || !is_string($record['email'] ?? null) || !is_string($record['username'] ?? null)) {
         return null;
     }
+    $record['full_name'] = is_string($record['full_name'] ?? null)
+        ? trim($record['full_name'])
+        : '';
     if ((int) ($record['expires'] ?? 0) < time()) {
         $expired = true;
         return null;
