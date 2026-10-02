@@ -216,7 +216,7 @@ apply_user() {
   fi
 }
 
-apply_scheduled_user {
+apply_scheduled_user() {
   local user="$1" now="$2" home="${STUDENT_ROOT}/$user" file
   file="$(policy_file "$user")"
   [[ -f "$file" ]] || return 0
