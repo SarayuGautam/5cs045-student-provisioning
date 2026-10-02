@@ -67,7 +67,7 @@ sshd -t
 echo "==> Enabling fail2ban for SSH"
 cp "${REPO_ROOT}/templates/fail2ban-5cs045.conf" /etc/fail2ban/jail.d/5cs045-sshd.conf
 # Point the lockout at the port students really use (not 22 here), or guessing is never blocked
-SSH_PORTS="$("${REPO_ROOT}/bin/ssh-ports.sh")"
+SSH_PORTS="$(bash "${REPO_ROOT}/bin/ssh-ports.sh")"
 sed -i "s/^port = ssh$/port = ${SSH_PORTS:-ssh}/" /etc/fail2ban/jail.d/5cs045-sshd.conf
 
 echo "==> Letting a whole class log in at once"
