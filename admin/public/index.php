@@ -205,7 +205,7 @@ try {
         keep_secret(['kind' => 'new', 'username' => $r['username'], 'password' => $r['password'],
             'emailed' => $r['emailed'] ? $r['email'] : null, 'email_error' => $r['email_error']]);
         flash('success', "{$r['username']} is ready. Their websites start working in about 10 seconds.");
-        redirect("/students/{$r['username']}");
+        redirect("/students/{$r['username']}/manage");
     }
 
     // Server health
