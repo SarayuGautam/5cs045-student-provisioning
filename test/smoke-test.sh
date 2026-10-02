@@ -63,6 +63,7 @@ su - smoketest_a -s /bin/bash -c 'ls /srv/students/' >/dev/null 2>&1 \
 
 echo ""
 echo "=== automatic read-access checks ==="
+"$DEPLOY_ROOT/bin/student-access.sh" set smoketest_a 1 open 0 open 0 >/dev/null 2>&1   || bad "could not open Assessment for automatic read-access test"
 su - smoketest_a -s /bin/bash -c 'mkdir -p /srv/students/smoketest_a/assessment/sub && echo hi > /srv/students/smoketest_a/assessment/sub/f.txt'
 su -s /bin/bash www-data -c 'cat /srv/students/smoketest_a/assessment/sub/f.txt' >/dev/null 2>&1 \
   && ok "www-data can read newly-created content without chmod" \
@@ -106,7 +107,7 @@ done
 [[ ! -d "/srv/students/smoketest_a/workshops/week7" ]] \
   && ok "week7 is not created" \
   || bad "week7 should not be a workshop folder"
-"$DEPLOY_ROOT/bin/student-access.sh" set smoketest_a 1 locked 0 locked 0 0 >/dev/null 2>&1   || bad "could not lock Exam and Assessment for folder-access test"
+"$DEPLOY_ROOT/bin/student-access.sh" set smoketest_a 1 locked 0 locked 0 >/dev/null 2>&1   || bad "could not lock Exam and Assessment for folder-access test"
 su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/exam/locked.txt' >/dev/null 2>&1   && bad "student can write to locked Exam folder" || ok "locked Exam folder rejects student writes"
 su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/assessment/locked.txt' >/dev/null 2>&1   && bad "student can write to locked Assessment folder" || ok "locked Assessment folder rejects student writes"
 "$DEPLOY_ROOT/bin/student-access.sh" set smoketest_a 1 open 0 scheduled "$(( $(date +%s) + 600 ))" >/dev/null 2>&1   || bad "could not schedule Assessment access for folder-access test"
@@ -150,7 +151,7 @@ check_code "$BASE_URL/smtp_config.php" "404" "smtp_config.php is not servable ov
 ROOT_PAGE="$("${CURL[@]}" "$STUDENT_URL/~smoketest_a/" 2>/dev/null)"
 [[ "$ROOT_PAGE" == *"Welcome, smoketest_a"* ]] && ok "student root URL shows the welcome page" || bad "student root URL did not show the welcome page"
 FOLDER_PAGE="$("${CURL[@]}" "$STUDENT_URL/~smoketest_b/workshops/" 2>/dev/null)"
-[[ "$FOLDER_PAGE" == *"Upload this week"* ]] && ok "an empty folder shows its short description" || bad "an empty folder did not show its description"
+[[ "$FOLDER_PAGE" == *"Open the week folder you were given"* ]] && ok "an empty folder shows its short description" || bad "an empty folder did not show its description"
 
 echo ""
 echo "=== resource limit checks ==="
