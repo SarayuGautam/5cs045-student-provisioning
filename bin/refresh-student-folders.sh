@@ -11,9 +11,9 @@ WEB_GROUP="www-data"
 
 declare -A FOLDER_TITLE=([workshops]="Workshops" [exam]="Exam" [assessment]="Assessment")
 declare -A FOLDER_INFO=(
-  [workshops]="Use this folder for your weekly workshop work. Make one folder for each week, for example week1."
-  [exam]="Use this folder for the timed practical exam."
-  [assessment]="Use this folder for your final assessment project."
+  [workshops]="Open the week folder you were given, for example week1. The workshops folder itself is not a place to upload files."
+  [exam]="Your exam folder is opened by your tutor when the exam is available."
+  [assessment]="Your assessment folder is opened by your tutor when the assessment is available."
 )
 
 [[ $EUID -eq 0 ]] || { echo "ERROR: run this with sudo" >&2; exit 1; }

@@ -32,6 +32,7 @@ const REGISTRY_DIR = '/var/lib/5cs045-registrations';
 const CRED_DIR = '/var/lib/5cs045-credentials';
 const DB_OVER_DIR = '/var/lib/5cs045-db-over';
 const QUOTA_OVERRIDE_DIR = '/var/lib/5cs045-quota-overrides';
+const STUDENT_ACCESS_TOOL = DEPLOY_ROOT . '/bin/student-access.sh';
 const DEFAULT_QUOTA_MB = 500;
 const DB_LIMIT_MB = 100;
 const IDLE_TIMEOUT = 1800;
@@ -246,6 +247,91 @@ function saved_password(string $user): ?string {
         $raw !== false &&
         preg_match('/^PASSWORD=(\S+)/m', $raw, $m)
     ) ? $m[1] : null;
+}
+
+function student_folder_access(string $user): array {
+    [$code, $out, $err] = run([
+        STUDENT_ACCESS_TOOL,
+        'get',
+        $user
+    ]);
+
+    if ($code !== 0) {
+        refuse(
+            'Could not read folder access: ' .
+            trim($err ?: $out)
+        );
+    }
+
+    $data = [
+        'workshop_weeks' => 1,
+        'exam_mode' => 'open',
+        'exam_at' => 0,
+        'assessment_mode' => 'open',
+        'assessment_at' => 0
+    ];
+
+    foreach (explode("\n", trim($out)) as $line) {
+        if (preg_match('/^([a-z_]+)=(.*)$/', $line, $m)) {
+            $key = $m[1];
+            if (array_key_exists($key, $data)) {
+                $data[$key] = in_array($key, ['workshop_weeks', 'exam_at', 'assessment_at'], true)
+                    ? (int) $m[2]
+                    : $m[2];
+            }
+        }
+    }
+
+    return [
+        'workshop_weeks' => max(1, min(52, (int) $data['workshop_weeks'])),
+        'exam' => [
+            'mode' => in_array($data['exam_mode'], ['open', 'locked', 'scheduled'], true) ? $data['exam_mode'] : 'open',
+            'at' => max(0, (int) $data['exam_at'])
+        ],
+        'assessment' => [
+            'mode' => in_array($data['assessment_mode'], ['open', 'locked', 'scheduled'], true) ? $data['assessment_mode'] : 'open',
+            'at' => max(0, (int) $data['assessment_at'])
+        ]
+    ];
+}
+
+function set_student_folder_access(
+    string $user,
+    int $weeks,
+    string $examMode,
+    int $examAt,
+    string $assessmentMode,
+    int $assessmentAt
+): void {
+    if ($weeks < 1 || $weeks > 52) {
+        refuse('Choose between 1 and 52 workshop weeks.');
+    }
+
+    if (!in_array($examMode, ['open', 'locked', 'scheduled'], true)) {
+        refuse('Choose a valid Exam access mode.');
+    }
+
+    if (!in_array($assessmentMode, ['open', 'locked', 'scheduled'], true)) {
+        refuse('Choose a valid Assessment access mode.');
+    }
+
+    [$code, $out, $err] = run([
+        STUDENT_ACCESS_TOOL,
+        'set',
+        $user,
+        (string) $weeks,
+        $examMode,
+        (string) $examAt,
+        $assessmentMode,
+        (string) $assessmentAt
+    ]);
+
+    if ($code !== 0) {
+        refuse(
+            'Could not save folder access: ' .
+            trim($err ?: $out)
+        );
+    }
 }
 
 function valid_email(string $email): bool {
@@ -2728,6 +2814,9 @@ switch ($action) {
                 $row['server_url'] =
                     site_url();
 
+                $row['folder_access'] =
+                    student_folder_access($user);
+
                 reply($row);
             }
         }
@@ -3109,6 +3198,69 @@ switch ($action) {
                     ? null
                     : 'Disk quotas are off on this server, so the limit is saved but not enforced yet.'
         ]);
+
+    case 'set-folder-access':
+        $user =
+            student_or_refuse(
+                arg(
+                    $args,
+                    'username'
+                )
+            );
+
+        $weeks =
+            (int) arg(
+                $args,
+                'workshop_weeks',
+                '1'
+            );
+
+        $examMode =
+            arg(
+                $args,
+                'exam_mode',
+                'open'
+            );
+
+        $examAt =
+            (int) arg(
+                $args,
+                'exam_at',
+                '0'
+            );
+
+        $assessmentMode =
+            arg(
+                $args,
+                'assessment_mode',
+                'open'
+            );
+
+        $assessmentAt =
+            (int) arg(
+                $args,
+                'assessment_at',
+                '0'
+            );
+
+        set_student_folder_access(
+            $user,
+            $weeks,
+            $examMode,
+            $examAt,
+            $assessmentMode,
+            $assessmentAt
+        );
+
+        audit(
+            $admin,
+            $ip,
+            "updated folder access for {$user}: {$weeks} workshop week(s), exam={$examMode}, assessment={$assessmentMode}"
+        );
+
+        reply(
+            student_folder_access($user)
+        );
 
     case 'remove-student':
         $user =

@@ -58,7 +58,7 @@ rm -f /etc/systemd/system/user-*.slice.d/50-5cs045-limits.conf
 rmdir /etc/systemd/system/user-*.slice.d 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true
 rm -rf /etc/5cs045
-rm -rf /var/lib/5cs045-ratelimit /var/lib/5cs045-ip-ratelimit /var/lib/5cs045-registration-locks /var/lib/5cs045-registrations /var/lib/5cs045-signup-links /var/lib/5cs045-db-over /var/lib/5cs045-disk-alert-sent
+rm -rf /var/lib/5cs045-ratelimit /var/lib/5cs045-ip-ratelimit /var/lib/5cs045-registration-locks /var/lib/5cs045-registrations /var/lib/5cs045-signup-links /var/lib/5cs045-db-over /var/lib/5cs045-disk-alert-sent /var/lib/5cs045-student-access
 rm -f /var/log/5cs045-registration.log /var/log/5cs045-provisioning.log
 rm -f /var/www/html/index.php /var/www/html/register_handler.php /var/www/html/confirm_handler.php
 rm -rf /var/www/html/lib

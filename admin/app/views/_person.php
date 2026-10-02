@@ -6,6 +6,24 @@ $diskPct = percent($s['disk_used_mb'], $s['disk_limit_mb']);
 $dbPct = percent($s['db_mb'], $s['db_limit_mb']);
 $base = $s['server_url'];
 $pw = ($secret && $secret['username'] === $u) ? (string) ($secret['password'] ?? '') : '';
+$access = $s['folder_access'] ?? [
+  'workshop_weeks' => 1,
+  'exam' => ['mode' => 'open', 'at' => 0],
+  'assessment' => ['mode' => 'open', 'at' => 0],
+];
+$folderModeLabel = static function (array $area): string {
+  if ($area['mode'] === 'scheduled') {
+    return 'scheduled for ' . folder_datetime_label((int) $area['at']);
+  }
+
+  return $area['mode'] === 'locked' ? 'locked' : 'open';
+};
+$folderSummary = sprintf(
+  'Workshops: weeks 1–%d. Exam: %s. Assessment: %s.',
+  (int) $access['workshop_weeks'],
+  $folderModeLabel($access['exam']),
+  $folderModeLabel($access['assessment'])
+);
 ?>
 <div class="panel-body" data-person="<?= h($u) ?>">
   <a class="back" href="/"><?= icon('arrow-left') ?>All students</a>
@@ -114,6 +132,53 @@ $pw = ($secret && $secret['username'] === $u) ? (string) ($secret['password'] ??
   <?php endif; ?>
 
   <div class="fixes fixes-quiet">
+    <details class="fix">
+      <summary><?= icon('server') ?><span><strong>Folder access</strong><small><?= h($folderSummary) ?></small></span></summary>
+      <form method="post" action="/students/<?= h($u) ?>/folders" class="fix-form" data-busy>
+        <?= csrf_field() ?>
+
+        <label class="field">
+          <span class="label">Workshop folders through week</span>
+          <input type="number" name="workshop_weeks" min="1" max="52" value="<?= (int) $access['workshop_weeks'] ?>" required inputmode="numeric">
+          <span class="hint">Creates <span class="mono">week1</span> through <span class="mono">weekN</span>. Existing files are not deleted.</span>
+        </label>
+
+        <label class="field">
+          <span class="label">Exam access</span>
+          <select name="exam_mode">
+            <?php foreach (['locked' => 'Locked', 'open' => 'Open now', 'scheduled' => 'Open at a scheduled time'] as $value => $label): ?>
+              <option value="<?= h($value) ?>"<?= $access['exam']['mode'] === $value ? ' selected' : '' ?>><?= h($label) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <span class="hint">Locked means the student cannot enter or upload. Scheduled times use Nepal time.</span>
+        </label>
+
+        <label class="field">
+          <span class="label">Exam opens at</span>
+          <input type="datetime-local" name="exam_at" value="<?= h(folder_datetime_input((int) $access['exam']['at'])) ?>">
+          <span class="hint">Used only when Exam access is scheduled.</span>
+        </label>
+
+        <label class="field">
+          <span class="label">Assessment access</span>
+          <select name="assessment_mode">
+            <?php foreach (['locked' => 'Locked', 'open' => 'Open now', 'scheduled' => 'Open at a scheduled time'] as $value => $label): ?>
+              <option value="<?= h($value) ?>"<?= $access['assessment']['mode'] === $value ? ' selected' : '' ?>><?= h($label) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <span class="hint">Locked means the student cannot enter or upload. Scheduled times use Nepal time.</span>
+        </label>
+
+        <label class="field">
+          <span class="label">Assessment opens at</span>
+          <input type="datetime-local" name="assessment_at" value="<?= h(folder_datetime_input((int) $access['assessment']['at'])) ?>">
+          <span class="hint">Used only when Assessment access is scheduled.</span>
+        </label>
+
+        <div class="row"><button class="btn btn-primary" type="submit" data-busy-text="Saving…">Save folder access</button></div>
+      </form>
+    </details>
+
     <details class="fix">
       <summary><?= icon('server') ?><span><strong>Change disk limit</strong><small>Now <?= $s['disk_limit_mb'] ? h(fmt_mb($s['disk_limit_mb'])) : 'not enforced' ?>. The usual limit is <?= h(fmt_mb($s['default_quota_mb'])) ?>.</small></span></summary>
       <form method="post" action="/students/<?= h($u) ?>/quota" class="fix-form" data-busy>

@@ -62,7 +62,7 @@ install -o root -g root -m 644 "${REPO_ROOT}/templates/limits-5cs045-students.co
 install -o root -g root -m 644 "${REPO_ROOT}/templates/cron-5cs045" /etc/cron.d/5cs045
 echo root > /etc/cron.allow
 echo root > /etc/at.allow
-install -d -o root -g root -m 700 /var/lib/5cs045-db-over
+install -d -o root -g root -m 700 /var/lib/5cs045-db-over /var/lib/5cs045-student-access
 
 # Move old credentials.txt files out of the students' homes (students could edit them)
 install -d -o root -g root -m 700 /var/lib/5cs045-credentials
@@ -77,6 +77,7 @@ done
 
 "${DEPLOY_ROOT}/bin/refresh-student-folders.sh" >/dev/null
 "${DEPLOY_ROOT}/bin/apply-student-limits.sh" >/dev/null
+"${DEPLOY_ROOT}/bin/student-access.sh" all >/dev/null
 
 nginx -t
 systemctl reload nginx

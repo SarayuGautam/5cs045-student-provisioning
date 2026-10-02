@@ -82,6 +82,18 @@ After deploying the role system:
 - To keep an existing non-student account as a panel admin, use **Admin accounts -> Panel administrators**.
 - The old `5cs045-panel` group may be removed after the VAPT accounts are no longer needed.
 
+## Student folder controls
+
+The **Students** page also controls each student's workspace layout:
+
+- **Workshop folders through week** creates `~/workshops/week1` through `weekN` and locks any already-created later week folders.
+- The student's home directory and `~/workshops` itself are not writable, so files cannot be uploaded outside a managed work folder.
+- **Exam access** and **Assessment access** can each be **Locked**, **Open now**, or **Scheduled**. Scheduled times are stored outside the student home and applied automatically every minute.
+- A locked Exam/Assessment folder is inaccessible to the student until the admin opens it or its scheduled time arrives.
+- Folder-access changes are written to the admin log.
+
+The root-owned policy files live under `/var/lib/5cs045-student-access/`.
+
 ## Deployment
 
 Role changes touch both application code and the root-owned server action. Deploy with:

@@ -94,6 +94,18 @@ else
 fi
 
 echo ""
+echo "=== student folder layout and access checks ==="
+su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/outside.txt' >/dev/null 2>&1   && bad "student can write directly in their home" || ok "student cannot write directly in their home"
+su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/workshops/outside.txt' >/dev/null 2>&1   && bad "student can write directly in ~/workshops" || ok "student cannot write directly in ~/workshops"
+su - smoketest_a -s /bin/bash -c 'printf ok > /srv/students/smoketest_a/workshops/week1/write-test.txt' >/dev/null 2>&1   && ok "student can write inside an allowed workshop week" || bad "student cannot write inside an allowed workshop week"
+"$DEPLOY_ROOT/bin/student-access.sh" set smoketest_a 1 locked 0 locked 0 0 >/dev/null 2>&1   || bad "could not lock Exam and Assessment for folder-access test"
+su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/exam/locked.txt' >/dev/null 2>&1   && bad "student can write to locked Exam folder" || ok "locked Exam folder rejects student writes"
+su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/assessment/locked.txt' >/dev/null 2>&1   && bad "student can write to locked Assessment folder" || ok "locked Assessment folder rejects student writes"
+"$DEPLOY_ROOT/bin/student-access.sh" set smoketest_a 1 open 0 scheduled "$(( $(date +%s) + 600 ))" >/dev/null 2>&1   || bad "could not schedule Assessment access for folder-access test"
+su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/assessment/future.txt' >/dev/null 2>&1   && bad "student can write to Assessment before its scheduled time" || ok "scheduled Assessment folder remains locked before its opening time"
+"$DEPLOY_ROOT/bin/student-access.sh" set smoketest_a 1 open 0 open 0 >/dev/null 2>&1   || bad "could not restore open folder access after folder-access test"
+
+echo ""
 echo "=== PHP-FPM process isolation ==="
 su - smoketest_a -s /bin/bash -c 'echo "<?php echo posix_getpwuid(posix_geteuid())[\"name\"]; ?>" > /srv/students/smoketest_a/assessment/whoami.php'
 RESULT="$("${CURL[@]}" "$STUDENT_URL/~smoketest_a/assessment/whoami.php" 2>/dev/null)"

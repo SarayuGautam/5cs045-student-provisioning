@@ -46,9 +46,9 @@ function registration_key(string $email): string {
 // address, the server's IP included, just sends the browser here.
 const STUDENT_SITE_URL = 'https://fullstack-student.heraldcollege.edu.np';
 
-// Server Access Guide stored in Google Drive.
+// Canonical current student guide in this repository.
 const SERVER_ACCESS_GUIDE_URL =
-    'https://drive.google.com/file/d/1dYHPNEagjrgTZoFiXwzQKuDLKiA_Mgnd/view?usp=drive_link';
+    'https://github.com/SarayuGautam/5cs045-student-provisioning/blob/main/docs/Student_Server_Access_Guide.md';
 
 // An address from smtp_config.php for an email, or $default when it is missing or an IP address.
 // Emails always give the name: a private IP means nothing off campus, and server_url on older
@@ -94,7 +94,11 @@ function credentials_email_body(
         "-----------------------------\n" .
         "Username: {$username}\n" .
         "Password: {$password}\n" .
-        "Database: {$username}\n\n" .
+        "Database: {$username}\n" .
+        "SSH/SCP port: 22\n" .
+        "Workshop uploads: ~/workshops/weekN/\n" .
+        "Exam/Assessment access: your tutor opens these folders when they are available.\n" .
+        "Do not upload directly to ~/ or ~/workshops/.\n\n" .
         "Your website:\n" .
         "{$site}\n\n" .
         "Server Access Guide:\n" .
@@ -162,6 +166,12 @@ function credentials_email_html(
       <td>{$safeUsername}</td>
     </tr>
   </table>
+
+  <p>
+    <strong>SSH/SCP port:</strong> 22<br>
+    <strong>Workshop uploads:</strong> <code>~/workshops/weekN/</code><br>
+    <strong>Exam/Assessment:</strong> Your tutor opens these folders when they are available.
+  </p>
 
   <p>
     <strong>Your website:</strong><br>
