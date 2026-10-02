@@ -161,6 +161,24 @@ try {
         redirect('/');
     }
 
+    if (preg_match("#^/students/({$USER})/manage$#", $path, $m) && !$post) {
+        try {
+            $student = api('student', ['username' => $m[1]]);
+        } catch (ApiError $e) {
+            http_response_code(404);
+            render('error', ['title' => 'No such student', 'nav' => 'students', 'message' => $e->getMessage()]);
+        }
+        render('student-manage', [
+            'title' => $student['full_name'] !== '' ? $student['full_name'] : $student['username'],
+            'nav' => 'students',
+            's' => $student,
+            'secret' => take_secret(),
+            'settings' => api('settings'),
+            'old' => take_old(),
+            'flashes' => take_flashes(),
+        ]);
+    }
+
     if (preg_match("#^/students/({$USER})$#", $path, $m) && !$post) {
         try {
             $student = api('student', ['username' => $m[1]]);
@@ -195,18 +213,19 @@ try {
         render('server', ['title' => 'Server', 'nav' => 'server', 'health' => api('health'), 'jobs' => api('jobs')]);
     }
 
-        if (preg_match("#^/students/({$USER})/clear/(workshops|exam|assessment)$#", $path, $m) && $post) {
+        if (preg_match("#^/students/({$USER})/clear/(workshops|exam|assessment|week(?:1|2|3|4|5|6|8|9|10|11|12))$#", $path, $m) && $post) {
         [, $user, $area] = $m;
         try {
             api('clear-student-folder', [
                 'username' => $user,
                 'area' => $area,
             ]);
-            flash('success', ucfirst($area) . ' folder cleared for ' . $user . '.');
+            $label = str_starts_with($area, 'week') ? 'Week ' . substr($area, 4) : ucfirst($area);
+            flash('success', $label . ' cleared for ' . $user . '.');
         } catch (ApiError $e) {
             flash('error', $e->getMessage());
         }
-        redirect("/students/{$user}");
+        redirect($area === 'workshops' || $area === 'exam' || $area === 'assessment' || str_starts_with($area, 'week') ? "/students/{$user}/manage" : "/students/{$user}");
     }
 
 if (preg_match("#^/students/({$USER})/(reset|resend|password|quota|folders|remove)$#", $path, $m) && $post) {
