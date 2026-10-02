@@ -139,20 +139,33 @@ ensure_workshop_weeks() {
   shopt -u nullglob
 }
 
+repair_open_area() {
+  local user="$1" dir="$2" group="$3"
+
+  # Repair stale content when a root-owned locked folder becomes student-owned.
+  find "$dir" -mindepth 1 -type d \( ! -user "$user" -o ! -perm -u+w \) -exec chown "$user:$group" {} + -exec chmod 750 {} + 2>/dev/null || true
+  find "$dir" -mindepth 1 -type f \( ! -user "$user" -o ! -perm -u+w \) -exec chown "$user:$group" {} + -exec chmod 640 {} + 2>/dev/null || true
+  find "$dir" -mindepth 1 -type d -exec setfacl -m "g:$WEB_GROUP:rx" {} + 2>/dev/null || true
+  find "$dir" -mindepth 1 -type f -exec setfacl -m "g:$WEB_GROUP:r" {} + 2>/dev/null || true
+}
+
 set_area_open() {
-  local user="$1" area="$2" home="${STUDENT_ROOT}/$user" group
+  local user="$1" area="$2" home="${STUDENT_ROOT}/$user" group owner
   group="$(id -gn "$user")"
   dir="$home/$area"
   mkdir -p "$dir"
+  owner="$(stat -c "%U" "$dir" 2>/dev/null || true)"
+
+  # Rebuild the directory ACL deterministically: student writes, web server reads.
+  setfacl -b "$dir" 2>/dev/null || true
   chown "$user:$group" "$dir"
   chmod 750 "$dir"
-  # Make the owner's write permission explicit as well as the web server's read/execute
-  # access. This repairs directories that previously had an ACL mask or mode left behind
-  # by a locked state or an SSH upload.
   setfacl -m "u::rwx,g::r-x,g:$WEB_GROUP:r-x,m::rwx,o::---" "$dir" 2>/dev/null || true
   setfacl -m "d:u::rwx,d:g::r-x,d:g:$WEB_GROUP:r-x,d:m::rwx,d:o::---" "$dir" 2>/dev/null || true
-}
 
+  # Only recurse when transitioning from locked/root-owned to open/student-owned.
+  [[ "$owner" == "$user" ]] || repair_open_area "$user" "$dir" "$group"
+}
 set_area_locked() {
   local user="$1" area="$2" home="${STUDENT_ROOT}/$user"
   dir="$home/$area"
