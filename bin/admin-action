@@ -33,6 +33,7 @@ const CRED_DIR = '/var/lib/5cs045-credentials';
 const DB_OVER_DIR = '/var/lib/5cs045-db-over';
 const QUOTA_OVERRIDE_DIR = '/var/lib/5cs045-quota-overrides';
 const STUDENT_ACCESS_TOOL = DEPLOY_ROOT . '/bin/student-access.sh';
+const CLEAR_FOLDER_TOOL = DEPLOY_ROOT . '/bin/clear-student-folder.sh';
 const DEFAULT_QUOTA_MB = 500;
 const DB_LIMIT_MB = 100;
 const IDLE_TIMEOUT = 1800;
@@ -3261,6 +3262,49 @@ switch ($action) {
         reply(
             student_folder_access($user)
         );
+
+    case 'clear-student-folder':
+        $user =
+            student_or_refuse(
+                arg(
+                    $args,
+                    'username'
+                )
+            );
+
+        $area =
+            arg(
+                $args,
+                'area'
+            );
+
+        if (!in_array($area, ['workshops', 'exam', 'assessment'], true)) {
+            refuse('Choose Workshops, Exam, or Assessment.');
+        }
+
+        [$code, $out, $err] = run([
+            CLEAR_FOLDER_TOOL,
+            $user,
+            $area
+        ]);
+
+        if ($code !== 0) {
+            refuse(
+                'Could not clear the folder: ' .
+                trim($err ?: $out)
+            );
+        }
+
+        audit(
+            $admin,
+            $ip,
+            "cleared {$area} for {$user}"
+        );
+
+        reply([
+            'username' => $user,
+            'area' => $area
+        ]);
 
     case 'remove-student':
         $user =
