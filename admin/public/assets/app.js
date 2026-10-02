@@ -17,10 +17,23 @@ function enhance(root) {
   meters(root);
   busyForms(root);
   confirmInputs(root);
+  confirmActions(root);
   copyButtons(root);
   flashes(root);
   emailCheckboxes(root);
   fillChips(root);
+}
+
+// Destructive folder actions ask once before the POST is sent.
+function confirmActions(root) {
+  $('form[data-confirm-action]', root).forEach((form) => form.addEventListener('submit', (e) => {
+    if (form.dataset.confirmed) return;
+    if (!window.confirm(form.dataset.confirmAction || 'Are you sure?')) {
+      e.preventDefault();
+      return;
+    }
+    form.dataset.confirmed = '1';
+  }));
 }
 
 // Usage bars take their width from data-pct (the page's security policy blocks inline styles)
