@@ -214,12 +214,9 @@ apply_user() {
   else
     set_area_locked "$user" assessment
   fi
-
-  flock -u "$lock_fd"
-  eval "exec $lock_fd>&-"
 }
 
-apply_scheduled_user() {
+apply_scheduled_user {
   local user="$1" now="$2" home="${STUDENT_ROOT}/$user" file
   file="$(policy_file "$user")"
   [[ -f "$file" ]] || return 0
@@ -245,6 +242,9 @@ apply_scheduled_user() {
   else
     set_area_locked "$user" assessment
   fi
+
+  flock -u "$lock_fd"
+  eval "exec $lock_fd>&-"
 }
 
 get_user() {
