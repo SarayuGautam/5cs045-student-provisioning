@@ -34,7 +34,8 @@ chown root:root /srv/students
 chmod 711 /srv/students
 
 echo "==> Deploying provisioning tools"
-mkdir -p "${DEPLOY_ROOT}/bin" "${DEPLOY_ROOT}/templates"
+mkdir -p "${DEPLOY_ROOT}/bin" "${DEPLOY_ROOT}/templates" "${DEPLOY_ROOT}/test"
+install -o root -g root -m 750 "${REPO_ROOT}/test/smoke-test.sh" "${DEPLOY_ROOT}/test/smoke-test.sh"
 cp "${REPO_ROOT}"/bin/* "${DEPLOY_ROOT}/bin/"
 cp "${REPO_ROOT}/templates/php-fpm-pool.conf.template" "${DEPLOY_ROOT}/templates/"
 chmod 750 "${DEPLOY_ROOT}"/bin/*
