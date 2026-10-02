@@ -107,6 +107,12 @@ su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/assessment/fut
 
 echo ""
 echo "=== PHP-FPM process isolation ==="
+# Re-open Assessment immediately before the PHP checks so the once-a-minute scheduled-access job
+# cannot race the test between the folder-policy checks and the PHP filesystem checks.
+"$DEPLOY_ROOT/bin/student-access.sh" set smoketest_a 1 open 0 open 0 >/dev/null 2>&1 \
+  || bad "could not open Assessment before PHP isolation checks"
+su - smoketest_a -s /bin/bash -c 'test -w /srv/students/smoketest_a/assessment' >/dev/null 2>&1 \
+  || bad "student cannot write to Assessment before PHP isolation checks"
 su - smoketest_a -s /bin/bash -c 'echo "<?php echo posix_getpwuid(posix_geteuid())[\"name\"]; ?>" > /srv/students/smoketest_a/assessment/whoami.php'
 RESULT="$("${CURL[@]}" "$STUDENT_URL/~smoketest_a/assessment/whoami.php" 2>/dev/null)"
 [[ "$RESULT" == "smoketest_a" ]] \
@@ -136,7 +142,7 @@ check_code "$BASE_URL/smtp_config.php" "404" "smtp_config.php is not servable ov
 ROOT_PAGE="$("${CURL[@]}" "$STUDENT_URL/~smoketest_a/" 2>/dev/null)"
 [[ "$ROOT_PAGE" == *"Welcome, smoketest_a"* ]] && ok "student root URL shows the welcome page" || bad "student root URL did not show the welcome page"
 FOLDER_PAGE="$("${CURL[@]}" "$STUDENT_URL/~smoketest_b/workshops/" 2>/dev/null)"
-[[ "$FOLDER_PAGE" == *"weekly workshop work"* ]] && ok "an empty folder shows its short description" || bad "an empty folder did not show its description"
+[[ "$FOLDER_PAGE" == *"Use the week folder you were given"* ]] && ok "an empty folder shows its short description" || bad "an empty folder did not show its description"
 
 echo ""
 echo "=== resource limit checks ==="
