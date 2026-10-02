@@ -42,6 +42,7 @@ if ($link === null) {
 
 $email = $link['email'];
 $username = derive_username($email);
+$fullName = trim((string) ($link['full_name'] ?? ''));
 
 if ($username === null || $username !== $link['username']) {
     delete_signup_link($token);
@@ -76,9 +77,14 @@ if (id_exists($username)) {
     );
 }
 
+$nameArg = $fullName !== ''
+    ? ' -n ' . escapeshellarg($fullName)
+    : '';
+
 $cmd = sprintf(
-    'sudo -n %s -d -u %s 2>&1',
+    'sudo -n %s -d%s -u %s 2>&1',
     escapeshellarg(ADD_STUDENT_SCRIPT),
+    $nameArg,
     escapeshellarg($username)
 );
 
@@ -101,7 +107,7 @@ if ($exitCode !== 0) {
 
 // The account exists now: record the email so it cannot sign up again, and use up the link.
 try {
-    mark_registered($email, $username);
+    mark_registered($email, $username, 'complete', $fullName);
 } catch (Throwable $e) {
     audit_log("FAILURE {$username}: " . $e->getMessage());
 }
