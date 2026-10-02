@@ -30,12 +30,17 @@ $folderSummary = sprintf(
   <?php require __DIR__ . '/_flashes.php'; ?>
 
   <header class="person-head">
-    <h2><?= h($name) ?></h2>
-    <p class="person-ids">
+    <div class="person-title-row">
+      <div>
+        <h2><?= h($name) ?></h2>
+        <p class="person-ids">
       <span class="mono" id="uname"><?= h($u) ?></span>
       <button type="button" class="icon-btn" data-copy="#uname" aria-label="Copy the username"><?= icon('copy') ?></button>
       <?php if ($s['online']): ?><span class="online">Signed in now</span><?php endif; ?>
-    </p>
+        </p>
+      </div>
+      <a class="btn btn-small manage-link" href="/students/<?= h($u) ?>/manage"><?= icon('settings') ?><span>Open full manager</span></a>
+    </div>
     <?php if ($s['email']): ?><p class="muted"><?= h($s['email']) ?></p><?php endif; ?>
   </header>
 
@@ -145,6 +150,33 @@ $folderSummary = sprintf(
       <dd><?= h(fmt_date($s['registered_at']) ?: 'Unknown') ?></dd>
     </div>
   </dl>
+
+  <section class="workshop-manager" aria-labelledby="workshop-title">
+    <div class="section-title-row">
+      <div>
+        <h3 id="workshop-title">Workshop weeks</h3>
+        <p class="small muted">11 folders · week 7 is intentionally skipped. Open a week to view it, or clear only that week's files.</p>
+      </div>
+      <form method="post" action="/students/<?= h($u) ?>/clear/workshops" data-busy data-confirm-action="<?= h("Clear all workshop weeks for {$u}? This deletes every workshop file and cannot be undone.") ?>">
+        <?= csrf_field() ?>
+        <button class="btn btn-danger btn-small" type="submit" data-busy-text="Clearing…"><?= icon('trash') ?><span>Clear all</span></button>
+      </form>
+    </div>
+    <div class="week-grid">
+      <?php foreach ([1,2,3,4,5,6,8,9,10,11,12] as $week): ?>
+        <article class="week-card">
+          <a class="week-open" href="<?= h("{$base}/~{$u}/workshops/week{$week}/") ?>" target="_blank" rel="noopener noreferrer">
+            <span class="week-number">Week <?= $week ?></span>
+            <span class="week-action">Open <?= icon('external') ?></span>
+          </a>
+          <form method="post" action="/students/<?= h($u) ?>/clear/week<?= $week ?>" data-busy data-confirm-action="<?= h("Clear Week {$week} for {$u}? This deletes the files in this workshop folder and cannot be undone.") ?>">
+            <?= csrf_field() ?>
+            <button class="week-clear" type="submit" data-busy-text="Clearing…"><?= icon('trash') ?><span>Clear files</span></button>
+          </form>
+        </article>
+      <?php endforeach; ?>
+    </div>
+  </section>
 
   <?php if ($base !== ''): ?>
     <p class="sites">
