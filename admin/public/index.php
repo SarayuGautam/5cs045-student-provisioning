@@ -195,7 +195,21 @@ try {
         render('server', ['title' => 'Server', 'nav' => 'server', 'health' => api('health'), 'jobs' => api('jobs')]);
     }
 
-    if (preg_match("#^/students/({$USER})/(reset|resend|password|quota|folders|remove)$#", $path, $m) && $post) {
+        if (preg_match("#^/students/({$USER})/clear/(workshops|exam|assessment)$#", $path, $m) && $post) {
+        [, $user, $area] = $m;
+        try {
+            api('clear-student-folder', [
+                'username' => $user,
+                'area' => $area,
+            ]);
+            flash('success', ucfirst($area) . ' folder cleared for ' . $user . '.');
+        } catch (ApiError $e) {
+            flash('error', $e->getMessage());
+        }
+        redirect("/students/{$user}");
+    }
+
+if (preg_match("#^/students/({$USER})/(reset|resend|password|quota|folders|remove)$#", $path, $m) && $post) {
         [, $user, $what] = $m;
         $back = "/students/{$user}";
         try {
