@@ -19,6 +19,7 @@ set -euo pipefail
 
 STUDENT_ROOT="/srv/students"
 POLICY_DIR="/var/lib/5cs045-student-access"
+LOCK_DIR="${POLICY_DIR}/.locks"
 WEB_GROUP="www-data"
 FIXED_WORKSHOP_WEEKS=(1 2 3 4 5 6 8 9 10 11 12)
 WORKSHOP_FOLDER_COUNT=${#FIXED_WORKSHOP_WEEKS[@]}
@@ -213,6 +214,9 @@ apply_user() {
   else
     set_area_locked "$user" assessment
   fi
+
+  flock -u "$lock_fd"
+  eval "exec $lock_fd>&-"
 }
 
 apply_scheduled_user() {
@@ -220,6 +224,10 @@ apply_scheduled_user() {
   file="$(policy_file "$user")"
   [[ -f "$file" ]] || return 0
   valid_user "$user"
+
+  local lock_file="$LOCK_DIR/$user"
+  exec {lock_fd}>"$lock_file"
+  flock -n "$lock_fd" || return 0
 
   EXAM_MODE="$(policy_value EXAM_MODE "$file" open)"
   EXAM_AT="$(policy_value EXAM_AT "$file" 0)"
@@ -269,7 +277,7 @@ set_user() {
     assessment_at=0
   fi
 
-  install -d -o root -g root -m 700 "$POLICY_DIR"
+  install -d -o root -g root -m 700 "$POLICY_DIR" "$LOCK_DIR"
   local file tmp
   file="$(policy_file "$user")"
   tmp="$(mktemp "$POLICY_DIR/.$user.XXXXXX")"
@@ -283,7 +291,12 @@ EOF
   chown root:root "$tmp"
   chmod 600 "$tmp"
   mv -f "$tmp" "$file"
+  local lock_file="$LOCK_DIR/$user"
+  exec {lock_fd}>"$lock_file"
+  flock "$lock_fd"
   apply_user "$user"
+  flock -u "$lock_fd"
+  eval "exec $lock_fd>&-"
   echo "saved $user"
 }
 
