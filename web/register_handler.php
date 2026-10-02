@@ -82,6 +82,17 @@ if (preg_match('/[\x00-\x1F\x7F]/', $fullName)) {
     respond_and_redirect(false, 'Please enter your name without control characters.');
 }
 
+$fullName = trim((string) ($_POST['full_name'] ?? ''));
+if ($fullName === '') {
+    respond_and_redirect(false, 'Please enter your full name.');
+}
+if (mb_strlen($fullName, 'UTF-8') > 100) {
+    respond_and_redirect(false, 'Your name must be 100 characters or fewer.');
+}
+if (preg_match('/[\x00-\x1F\x7F]/', $fullName)) {
+    respond_and_redirect(false, 'Please enter your name without control characters.');
+}
+
 $email = strtolower(trim((string) ($_POST['email'] ?? '')));
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     respond_and_redirect(false, 'Please enter a valid college email.');
