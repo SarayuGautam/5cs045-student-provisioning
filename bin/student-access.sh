@@ -20,8 +20,8 @@ set -euo pipefail
 STUDENT_ROOT="/srv/students"
 POLICY_DIR="/var/lib/5cs045-student-access"
 WEB_GROUP="www-data"
-DEFAULT_WORKSHOP_WEEKS=1
-MAX_WORKSHOP_WEEKS=52
+FIXED_WORKSHOP_WEEKS=(1 2 3 4 5 6 8 9 10 11 12)
+WORKSHOP_FOLDER_COUNT=${#FIXED_WORKSHOP_WEEKS[@]}
 USERNAME_RE='^[a-z][a-z0-9_]{2,31}$'
 
 die() {
@@ -104,11 +104,10 @@ PAGE
 }
 
 ensure_workshop_weeks() {
-  local user="$1" home="${STUDENT_ROOT}/$user" weeks="$2" group
+  local user="$1" home="${STUDENT_ROOT}/$user" group
   group="$(id -gn "$user")"
-  (( weeks >= 1 && weeks <= MAX_WORKSHOP_WEEKS )) || die "workshop weeks must be between 1 and $MAX_WORKSHOP_WEEKS"
 
-  for n in $(seq 1 "$weeks"); do
+  for n in "${FIXED_WORKSHOP_WEEKS[@]}"; do
     dir="$home/workshops/week$n"
     mkdir -p "$dir"
     chown "$user:$group" "$dir"
@@ -118,13 +117,20 @@ ensure_workshop_weeks() {
     write_week_index "$user" "$n"
   done
 
-  # A lower week limit must also lock older, already-created later weeks.
+  # Keep legacy/unmanaged week folders inaccessible without deleting their contents.
   shopt -s nullglob
   for dir in "$home"/workshops/week*/; do
     name="$(basename "$dir")"
     [[ "$name" =~ ^week([0-9]+)$ ]] || continue
     n="${BASH_REMATCH[1]}"
-    (( n > weeks )) || continue
+    keep=0
+    for allowed in "${FIXED_WORKSHOP_WEEKS[@]}"; do
+      if (( n == allowed )); then
+        keep=1
+        break
+      fi
+    done
+    (( keep == 1 )) && continue
     chown root:root "$dir"
     chmod 700 "$dir"
     setfacl -b "$dir" 2>/dev/null || true
@@ -164,17 +170,7 @@ area_is_open() {
 }
 
 default_workshop_weeks() {
-  local user="$1" home="${STUDENT_ROOT}/$user" dir name n max=1
-  shopt -s nullglob
-  for dir in "$home"/workshops/week*/; do
-    name="$(basename "$dir")"
-    [[ "$name" =~ ^week([0-9]+)$ ]] || continue
-    n="${BASH_REMATCH[1]}"
-    (( n > max )) && max="$n"
-  done
-  shopt -u nullglob
-  (( max <= MAX_WORKSHOP_WEEKS )) || max="$MAX_WORKSHOP_WEEKS"
-  printf '%s' "$max"
+  printf "%s" "$WORKSHOP_FOLDER_COUNT"
 }
 
 default_area_mode() {
@@ -188,17 +184,15 @@ default_area_mode() {
   fi
 }
 read_policy() {
-  local user="$1" file default_weeks
+  local user="$1" file
   file="$(policy_file "$user")"
-  default_weeks="$(default_workshop_weeks "$user")"
-  WORKSHOP_WEEKS="$(policy_value WORKSHOP_WEEKS "$file" "$default_weeks")"
+  WORKSHOP_WEEKS="$WORKSHOP_FOLDER_COUNT"
   EXAM_MODE="$(policy_value EXAM_MODE "$file" "$(default_area_mode "$user" exam)")"
   EXAM_AT="$(policy_value EXAM_AT "$file" 0)"
   ASSESSMENT_MODE="$(policy_value ASSESSMENT_MODE "$file" "$(default_area_mode "$user" assessment)")"
   ASSESSMENT_AT="$(policy_value ASSESSMENT_AT "$file" 0)"
 
-  [[ "$WORKSHOP_WEEKS" =~ ^[0-9]+$ ]] || WORKSHOP_WEEKS="$DEFAULT_WORKSHOP_WEEKS"
-  (( WORKSHOP_WEEKS >= 1 && WORKSHOP_WEEKS <= MAX_WORKSHOP_WEEKS )) || WORKSHOP_WEEKS="$DEFAULT_WORKSHOP_WEEKS"
+  WORKSHOP_WEEKS="$WORKSHOP_FOLDER_COUNT"
 }
 
 apply_user() {
@@ -259,7 +253,7 @@ get_user() {
 set_user() {
   local user="$1" weeks="$2" exam_mode="$3" exam_at="$4" assessment_mode="$5" assessment_at="$6"
   valid_user "$user"
-  [[ "$weeks" =~ ^[0-9]+$ ]] && (( weeks >= 1 && weeks <= MAX_WORKSHOP_WEEKS )) || die "workshop weeks must be between 1 and $MAX_WORKSHOP_WEEKS"
+  [[ "$weeks" =~ ^[0-9]+$ ]] || weeks="$WORKSHOP_FOLDER_COUNT"
   [[ "$exam_mode" =~ ^(open|locked|scheduled)$ ]] || die "exam mode must be open, locked or scheduled"
   [[ "$assessment_mode" =~ ^(open|locked|scheduled)$ ]] || die "assessment mode must be open, locked or scheduled"
 
@@ -280,7 +274,7 @@ set_user() {
   file="$(policy_file "$user")"
   tmp="$(mktemp "$POLICY_DIR/.$user.XXXXXX")"
   cat > "$tmp" <<EOF
-WORKSHOP_WEEKS=$weeks
+WORKSHOP_WEEKS=$WORKSHOP_FOLDER_COUNT
 EXAM_MODE=$exam_mode
 EXAM_AT=$exam_at
 ASSESSMENT_MODE=$assessment_mode
