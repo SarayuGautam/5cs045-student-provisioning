@@ -71,6 +71,17 @@ if (!hash_equals((string) ($_SESSION['register_csrf'] ?? ''), $csrf)) {
     respond_and_redirect(false, 'The form expired. Please try again.');
 }
 
+$fullName = trim((string) ($_POST['full_name'] ?? ''));
+if ($fullName === '') {
+    respond_and_redirect(false, 'Please enter your full name.');
+}
+if (mb_strlen($fullName, 'UTF-8') > 100) {
+    respond_and_redirect(false, 'Your name must be 100 characters or fewer.');
+}
+if (preg_match('/[\x00-\x1F\x7F]/', $fullName)) {
+    respond_and_redirect(false, 'Please enter your name without control characters.');
+}
+
 $email = strtolower(trim((string) ($_POST['email'] ?? '')));
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     respond_and_redirect(false, 'Please enter a valid college email.');
@@ -117,7 +128,7 @@ if (!acquire_request_lock($email)) {
 
 prune_signup_links();
 try {
-    $token = create_signup_link($email, $username);
+    $token = create_signup_link($email, $username, $fullName);
 } catch (Throwable $e) {
     forget_recent_request($email);
     audit_log('FAILURE ' . $e->getMessage());
