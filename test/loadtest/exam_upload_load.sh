@@ -1,81 +1,127 @@
 ```bash
 #!/usr/bin/env bash
 
-# 5CS045 Exam Upload Load Test
+# 5CS045 Exam Scenario Load Test
 #
-# Scenario:
-#   - Each student uploads a 30 MiB file
-#   - Upload must complete within 60 seconds
-#   - Students run concurrently
-#   - Files are uploaded to ~/assessment/
+# The test accounts are created by create-accounts.sh:
+#   loadtest_001, loadtest_002, ...
 #
-# Usage:
-#   ./exam_upload_load.sh SERVER_IP accounts.csv
+# This script:
+#   1. Discovers the load-test accounts directly from the server
+#   2. Creates a 30 MiB assessment file for every student
+#   3. Writes all students concurrently
+#   4. Enforces a 60-second per-student deadline
+#   5. Verifies every resulting file size
+#   6. Produces a per-student CSV report
+#   7. Removes the test files by default
 #
-# Example:
-#   ./exam_upload_load.sh 10.80.0.250 loadtest-accounts.csv
-#
-# CSV format:
-#   username,password
+# IMPORTANT:
+# This is a SERVER-SIDE storage/load test. It does not emulate the
+# network path from a student's computer to the server.
 
 set -u
 
-HOST="${1:-}"
-ACCOUNTS_FILE="${2:-}"
-
-SSH_PORT="${SSH_PORT:-50222}"
+PREFIX="${PREFIX:-loadtest_}"
 FILE_SIZE_MB="${FILE_SIZE_MB:-30}"
 DEADLINE="${DEADLINE:-60}"
-REMOTE_DIR="${REMOTE_DIR:-assessment}"
+ASSESSMENT_DIR="${ASSESSMENT_DIR:-assessment}"
 KEEP_FILES="${KEEP_FILES:-0}"
 
-if [[ -z "$HOST" || -z "$ACCOUNTS_FILE" ]]; then
-    echo "Usage: $0 SERVER_IP accounts.csv"
-    echo
-    echo "Environment variables:"
-    echo "  SSH_PORT=50222"
-    echo "  FILE_SIZE_MB=30"
-    echo "  DEADLINE=60"
-    echo "  REMOTE_DIR=assessment"
-    echo "  KEEP_FILES=0"
-    exit 1
-fi
-
-if [[ ! -f "$ACCOUNTS_FILE" ]]; then
-    echo "ERROR: Accounts file not found: $ACCOUNTS_FILE"
-    exit 1
-fi
-
-if ! command -v ssh >/dev/null 2>&1; then
-    echo "ERROR: ssh is required"
-    exit 1
-fi
-
-if ! command -v scp >/dev/null 2>&1; then
-    echo "ERROR: scp is required"
-    exit 1
-fi
-
-# ------------------------------------------------------------
-# Prepare test payload
-# ------------------------------------------------------------
+COUNT="${1:-0}"
 
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
-PAYLOAD="/tmp/exam-upload-${RUN_ID}.bin"
-RESULTS="exam-upload-results-${RUN_ID}.csv"
+WORK_DIR="/tmp/5cs045-exam-load-${RUN_ID}"
+RESULTS="exam-load-results-${RUN_ID}.csv"
+
+EXPECTED_BYTES=$((FILE_SIZE_MB * 1024 * 1024))
+
+# ------------------------------------------------------------
+# Checks
+# ------------------------------------------------------------
+
+[[ $EUID -eq 0 ]] || {
+    echo "ERROR: run this with sudo"
+    exit 1
+}
+
+if ! [[ "$FILE_SIZE_MB" =~ ^[0-9]+$ ]] || (( FILE_SIZE_MB < 1 )); then
+    echo "ERROR: FILE_SIZE_MB must be a positive integer"
+    exit 1
+fi
+
+if ! [[ "$DEADLINE" =~ ^[0-9]+$ ]] || (( DEADLINE < 1 )); then
+    echo "ERROR: DEADLINE must be a positive integer"
+    exit 1
+fi
+
+mkdir -p "$WORK_DIR"
+
+cleanup() {
+    if [[ "$KEEP_FILES" -ne 1 ]]; then
+        rm -rf "$WORK_DIR"
+    fi
+}
+
+trap cleanup EXIT INT TERM
+
+# ------------------------------------------------------------
+# Discover test accounts
+# ------------------------------------------------------------
+
+mapfile -t STUDENTS < <(
+    getent passwd |
+    awk -F: -v prefix="$PREFIX" '
+        index($1, prefix) == 1 {
+            suffix = substr($1, length(prefix) + 1)
+            if (suffix ~ /^[0-9]+$/)
+                print $1
+        }
+    ' |
+    sort -V
+)
+
+if [[ ${#STUDENTS[@]} -eq 0 ]]; then
+    echo "ERROR: No ${PREFIX} test accounts found."
+    echo
+    echo "Create them first, for example:"
+    echo
+    echo "  sudo ./test/loadtest/create-accounts.sh 100"
+    exit 1
+fi
+
+if (( COUNT > 0 )); then
+    if (( COUNT > ${#STUDENTS[@]} )); then
+        COUNT=${#STUDENTS[@]}
+    fi
+
+    STUDENTS=( "${STUDENTS[@]:0:COUNT}" )
+fi
+
+STUDENT_COUNT=${#STUDENTS[@]}
+
+# ------------------------------------------------------------
+# Header
+# ------------------------------------------------------------
 
 echo "============================================================"
-echo "5CS045 EXAM UPLOAD LOAD TEST"
+echo "5CS045 EXAM SCENARIO LOAD TEST"
 echo "============================================================"
-echo "Server:       $HOST"
-echo "SSH port:     $SSH_PORT"
-echo "File size:    ${FILE_SIZE_MB} MiB"
-echo "Deadline:     ${DEADLINE} seconds"
-echo "Remote dir:   ~/${REMOTE_DIR}"
+echo "Student prefix:  $PREFIX"
+echo "Students:        $STUDENT_COUNT"
+echo "File size:       ${FILE_SIZE_MB} MiB each"
+echo "Deadline:        ${DEADLINE} seconds"
+echo "Destination:     ~/${ASSESSMENT_DIR}/"
+echo "Run ID:          $RUN_ID"
 echo "============================================================"
-
 echo
-echo "Creating ${FILE_SIZE_MB} MiB test file..."
+
+# ------------------------------------------------------------
+# Create one common 30 MiB source payload
+# ------------------------------------------------------------
+
+PAYLOAD="$WORK_DIR/exam-submission.bin"
+
+echo "Creating ${FILE_SIZE_MB} MiB test submission..."
 
 dd if=/dev/zero \
    of="$PAYLOAD" \
@@ -84,142 +130,166 @@ dd if=/dev/zero \
    status=none
 
 if [[ $? -ne 0 ]]; then
-    echo "ERROR: Failed to create test file"
+    echo "ERROR: Could not create payload"
     exit 1
 fi
 
-echo "Payload: $PAYLOAD"
+chmod 644 "$PAYLOAD"
 
-# ------------------------------------------------------------
-# Count students
-# ------------------------------------------------------------
+ACTUAL_PAYLOAD_SIZE=$(stat -c %s "$PAYLOAD")
 
-STUDENT_COUNT=0
-
-while IFS=',' read -r username password; do
-    [[ "$username" == "username" ]] && continue
-    [[ -z "$username" ]] && continue
-    STUDENT_COUNT=$((STUDENT_COUNT + 1))
-done < "$ACCOUNTS_FILE"
-
-if [[ "$STUDENT_COUNT" -eq 0 ]]; then
-    echo "ERROR: No students found in $ACCOUNTS_FILE"
-    rm -f "$PAYLOAD"
+if [[ "$ACTUAL_PAYLOAD_SIZE" -ne "$EXPECTED_BYTES" ]]; then
+    echo "ERROR: Payload size mismatch"
+    echo "Expected: $EXPECTED_BYTES"
+    echo "Actual:   $ACTUAL_PAYLOAD_SIZE"
     exit 1
 fi
 
-echo "Students:     $STUDENT_COUNT"
-echo
-echo "Starting concurrent uploads..."
+echo "Payload ready: $ACTUAL_PAYLOAD_SIZE bytes"
 echo
 
 # ------------------------------------------------------------
-# Result file
+# Results
 # ------------------------------------------------------------
 
-echo "username,success,upload_seconds,bytes,error" > "$RESULTS"
-
-TMP_DIR="/tmp/exam-upload-results-${RUN_ID}"
-mkdir -p "$TMP_DIR"
+echo "username,success,elapsed_seconds,bytes,error" > "$RESULTS"
 
 # ------------------------------------------------------------
-# Upload function
+# Student exam submission
 # ------------------------------------------------------------
 
-upload_student() {
-    local index="$1"
-    local username="$2"
-    local password="$3"
+run_student() {
 
-    local start_time
-    local end_time
-    local elapsed
-    local remote_file
-    local result_file
-    local ssh_opts
+    local username="$1"
+    local result_file="$WORK_DIR/${username}.result"
 
-    result_file="${TMP_DIR}/${index}.result"
-    remote_file="${REMOTE_DIR}/exam-load-${RUN_ID}-${index}.bin"
+    local home
+    local target_dir
+    local target_file
 
-    # Disable host-key checking for a temporary load test.
-    # This avoids interactive prompts.
-    ssh_opts=(
-        -p "$SSH_PORT"
-        -o StrictHostKeyChecking=no
-        -o UserKnownHostsFile=/dev/null
-        -o ConnectTimeout=30
-        -o BatchMode=no
-    )
+    local start_ns
+    local end_ns
+    local elapsed_ms
+    local elapsed_seconds
 
-    start_time="$(date +%s)"
+    local actual_size
+    local status
 
-    # sshpass is required for password-based automated SSH.
-    if ! command -v sshpass >/dev/null 2>&1; then
-        echo "$username,FAIL,,0,sshpass not installed" > "$result_file"
+    home="$(getent passwd "$username" | cut -d: -f6)"
+
+    if [[ -z "$home" || ! -d "$home" ]]; then
+        echo "$username,FAIL,0,0,home directory not found" > "$result_file"
         return
     fi
 
-    # Make sure assessment directory exists.
-    sshpass -p "$password" ssh "${ssh_opts[@]}" \
-        "$username@$HOST" \
-        "mkdir -p '$REMOTE_DIR'" \
-        >/dev/null 2>&1
+    target_dir="${home}/${ASSESSMENT_DIR}"
+    target_file="${target_dir}/exam-load-${RUN_ID}.bin"
 
-    if [[ $? -ne 0 ]]; then
-        echo "$username,FAIL,,0,SSH login/directory creation failed" > "$result_file"
-        return
-    fi
+    # --------------------------------------------------------
+    # Assessment folder
+    # --------------------------------------------------------
 
-    # Upload using scp.
-    timeout "$DEADLINE" \
-        sshpass -p "$password" scp \
-        -P "$SSH_PORT" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
-        -o ConnectTimeout=30 \
-        "$PAYLOAD" \
-        "$username@$HOST:$remote_file" \
-        >/dev/null 2>&1
+    if [[ ! -d "$target_dir" ]]; then
+        if ! install -d \
+            -o "$username" \
+            -g "$(id -gn "$username")" \
+            -m 700 \
+            "$target_dir" 2>/dev/null; then
 
-    local upload_status=$?
-
-    end_time="$(date +%s)"
-    elapsed=$((end_time - start_time))
-
-    if [[ "$upload_status" -eq 0 && "$elapsed" -le "$DEADLINE" ]]; then
-
-        # Verify remote file size.
-        local expected_bytes
-        local remote_bytes
-
-        expected_bytes=$((FILE_SIZE_MB * 1024 * 1024))
-
-        remote_bytes="$(
-            sshpass -p "$password" ssh "${ssh_opts[@]}" \
-                "$username@$HOST" \
-                "stat -c %s '$remote_file'" \
-                2>/dev/null
-        )"
-
-        if [[ "$remote_bytes" == "$expected_bytes" ]]; then
-            echo "$username,PASS,$elapsed,$remote_bytes," > "$result_file"
-
-            # Remove only the test file unless KEEP_FILES=1.
-            if [[ "$KEEP_FILES" -ne 1 ]]; then
-                sshpass -p "$password" ssh "${ssh_opts[@]}" \
-                    "$username@$HOST" \
-                    "rm -f '$remote_file'" \
-                    >/dev/null 2>&1
-            fi
-        else
-            echo "$username,FAIL,$elapsed,$remote_bytes,size mismatch" > "$result_file"
+            echo "$username,FAIL,0,0,cannot create assessment directory" \
+                > "$result_file"
+            return
         fi
+    fi
 
-    elif [[ "$upload_status" -eq 124 ]]; then
-        echo "$username,FAIL,$DEADLINE,0,upload exceeded ${DEADLINE}s" > "$result_file"
+    # --------------------------------------------------------
+    # Start timer
+    # --------------------------------------------------------
 
-    else
-        echo "$username,FAIL,$elapsed,0,scp upload failed" > "$result_file"
+    start_ns=$(date +%s%N)
+
+    # --------------------------------------------------------
+    # Simulate student submission
+    #
+    # Run as the student so normal filesystem permissions,
+    # ownership and user quota are exercised.
+    # --------------------------------------------------------
+
+    timeout "${DEADLINE}s" \
+        runuser -u "$username" -- \
+        dd if="$PAYLOAD" \
+           of="$target_file" \
+           bs=1M \
+           count="$FILE_SIZE_MB" \
+           status=none \
+        >/dev/null 2>&1
+
+    status=$?
+
+    end_ns=$(date +%s%N)
+
+    elapsed_ms=$(( (end_ns - start_ns) / 1000000 ))
+    elapsed_seconds=$(( elapsed_ms / 1000 ))
+
+    # --------------------------------------------------------
+    # Timeout
+    # --------------------------------------------------------
+
+    if [[ "$status" -eq 124 ]]; then
+        echo "$username,FAIL,$elapsed_seconds,0,upload exceeded ${DEADLINE}s" \
+            > "$result_file"
+
+        rm -f "$target_file"
+        return
+    fi
+
+    # --------------------------------------------------------
+    # Write failed
+    # --------------------------------------------------------
+
+    if [[ "$status" -ne 0 ]]; then
+        echo "$username,FAIL,$elapsed_seconds,0,submission write failed" \
+            > "$result_file"
+
+        rm -f "$target_file"
+        return
+    fi
+
+    # --------------------------------------------------------
+    # Verify result
+    # --------------------------------------------------------
+
+    actual_size=$(stat -c %s "$target_file" 2>/dev/null || echo 0)
+
+    if [[ "$actual_size" -ne "$EXPECTED_BYTES" ]]; then
+        echo "$username,FAIL,$elapsed_seconds,$actual_size,size mismatch" \
+            > "$result_file"
+
+        rm -f "$target_file"
+        return
+    fi
+
+    # --------------------------------------------------------
+    # Deadline check
+    # --------------------------------------------------------
+
+    if (( elapsed_ms > DEADLINE * 1000 )); then
+        echo "$username,FAIL,$elapsed_seconds,$actual_size,deadline exceeded" \
+            > "$result_file"
+
+        rm -f "$target_file"
+        return
+    fi
+
+    # --------------------------------------------------------
+    # Success
+    # --------------------------------------------------------
+
+    echo "$username,PASS,$elapsed_seconds,$actual_size," \
+        > "$result_file"
+
+    if [[ "$KEEP_FILES" -ne 1 ]]; then
+        rm -f "$target_file"
     fi
 }
 
@@ -227,36 +297,27 @@ upload_student() {
 # Launch all students concurrently
 # ------------------------------------------------------------
 
-INDEX=0
+echo "Starting ${STUDENT_COUNT} concurrent exam submissions..."
+echo
+
 PIDS=()
 
-while IFS=',' read -r username password; do
+for username in "${STUDENTS[@]}"; do
 
-    # Skip CSV header
-    if [[ "$username" == "username" ]]; then
-        continue
-    fi
+    printf "  starting %-20s\n" "$username"
 
-    # Skip empty rows
-    [[ -z "$username" ]] && continue
+    run_student "$username" &
 
-    INDEX=$((INDEX + 1))
-
-    echo "Starting student $INDEX/$STUDENT_COUNT: $username"
-
-    upload_student "$INDEX" "$username" "$password" &
-
-    PIDS+=("$!")
-
-done < "$ACCOUNTS_FILE"
+    PIDS+=( "$!" )
+done
 
 echo
-echo "All $STUDENT_COUNT student uploads started."
-echo "Waiting for results..."
+echo "All submissions started."
+echo "Waiting for completion..."
 echo
 
 # ------------------------------------------------------------
-# Wait for all uploads
+# Wait for all processes
 # ------------------------------------------------------------
 
 for pid in "${PIDS[@]}"; do
@@ -267,46 +328,49 @@ done
 # Combine results
 # ------------------------------------------------------------
 
-for result in "$TMP_DIR"/*.result; do
-    [[ -f "$result" ]] || continue
-    cat "$result" >> "$RESULTS"
+for username in "${STUDENTS[@]}"; do
+    result_file="$WORK_DIR/${username}.result"
+
+    if [[ -f "$result_file" ]]; then
+        cat "$result_file" >> "$RESULTS"
+    else
+        echo "$username,FAIL,0,0,no result produced" >> "$RESULTS"
+    fi
 done
 
 # ------------------------------------------------------------
-# Summary
+# Statistics
 # ------------------------------------------------------------
 
 TOTAL=0
 PASSED=0
 FAILED=0
-TOTAL_BYTES=0
-MAX_TIME=0
-MIN_TIME=999999
-TOTAL_TIME=0
-TIMED_UPLOADS=0
 
-while IFS=',' read -r username success upload_seconds bytes error; do
+MIN_TIME=""
+MAX_TIME=0
+TOTAL_TIME=0
+TOTAL_BYTES=0
+
+while IFS=',' read -r username success elapsed_seconds bytes error; do
 
     [[ "$username" == "username" ]] && continue
 
     TOTAL=$((TOTAL + 1))
 
     if [[ "$success" == "PASS" ]]; then
+
         PASSED=$((PASSED + 1))
         TOTAL_BYTES=$((TOTAL_BYTES + bytes))
+        TOTAL_TIME=$((TOTAL_TIME + elapsed_seconds))
 
-        if [[ -n "$upload_seconds" ]]; then
-            TOTAL_TIME=$((TOTAL_TIME + upload_seconds))
-            TIMED_UPLOADS=$((TIMED_UPLOADS + 1))
-
-            if [[ "$upload_seconds" -gt "$MAX_TIME" ]]; then
-                MAX_TIME="$upload_seconds"
-            fi
-
-            if [[ "$upload_seconds" -lt "$MIN_TIME" ]]; then
-                MIN_TIME="$upload_seconds"
-            fi
+        if [[ -z "$MIN_TIME" || "$elapsed_seconds" -lt "$MIN_TIME" ]]; then
+            MIN_TIME="$elapsed_seconds"
         fi
+
+        if [[ "$elapsed_seconds" -gt "$MAX_TIME" ]]; then
+            MAX_TIME="$elapsed_seconds"
+        fi
+
     else
         FAILED=$((FAILED + 1))
     fi
@@ -315,44 +379,49 @@ done < "$RESULTS"
 
 TOTAL_MB=$((TOTAL_BYTES / 1024 / 1024))
 
+if (( PASSED > 0 )); then
+    AVG_TIME=$((TOTAL_TIME / PASSED))
+else
+    AVG_TIME=0
+fi
+
+# ------------------------------------------------------------
+# Summary
+# ------------------------------------------------------------
+
 echo
 echo "============================================================"
-echo "EXAM UPLOAD RESULTS"
+echo "EXAM SCENARIO RESULTS"
 echo "============================================================"
-echo "Students:           $TOTAL"
-echo "Passed:             $PASSED/$TOTAL"
-echo "Failed:             $FAILED"
-echo "Verified uploaded:  ${TOTAL_MB} MiB"
+echo "Students:            $TOTAL"
+echo "Passed:              $PASSED"
+echo "Failed:              $FAILED"
+echo "File per student:    ${FILE_SIZE_MB} MiB"
+echo "Required deadline:   ${DEADLINE} seconds"
+echo "Verified data:       ${TOTAL_MB} MiB"
 
-if [[ "$TIMED_UPLOADS" -gt 0 ]]; then
-    AVG_TIME=$((TOTAL_TIME / TIMED_UPLOADS))
-
-    echo "Upload time min:    ${MIN_TIME}s"
-    echo "Upload time avg:    ${AVG_TIME}s"
-    echo "Upload time max:    ${MAX_TIME}s"
+if (( PASSED > 0 )); then
+    echo "Submission time min: ${MIN_TIME}s"
+    echo "Submission time avg: ${AVG_TIME}s"
+    echo "Submission time max: ${MAX_TIME}s"
 fi
 
 echo
-echo "Per-student report: $RESULTS"
+echo "Per-student report:  $RESULTS"
 
-if [[ "$FAILED" -gt 0 ]]; then
+if (( FAILED > 0 )); then
     echo
     echo "FAILED STUDENTS:"
-    awk -F',' '$2 != "PASS" {print "  " $1 " - " $5}' "$RESULTS"
+    awk -F',' '$2 != "PASS" {
+        printf "  %-20s %s\n", $1, $5
+    }' "$RESULTS"
 fi
 
-# ------------------------------------------------------------
-# Cleanup
-# ------------------------------------------------------------
+echo "============================================================"
 
-rm -rf "$TMP_DIR"
-rm -f "$PAYLOAD"
-
-echo
-echo "Test completed."
-
-if [[ "$FAILED" -eq 0 ]]; then
-    exit 0
-else
+if (( FAILED > 0 )); then
     exit 1
+fi
+
+exit 0
 ```
