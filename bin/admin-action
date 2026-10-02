@@ -3256,7 +3256,7 @@ switch ($action) {
         audit(
             $admin,
             $ip,
-            "updated folder access for {$user}: {$weeks} workshop week(s), exam={$examMode}, assessment={$assessmentMode}"
+            "updated folder access for {$user}: workshops=week1-6,week8-12, exam={$examMode}, assessment={$assessmentMode}"
         );
 
         reply(
