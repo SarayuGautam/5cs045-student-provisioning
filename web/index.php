@@ -210,12 +210,12 @@ form {
     margin: 0 auto;
 }
 
-.field-label {
-    display: block;
-    margin-bottom: 9px;
-    font-size: 13px;
-    font-weight: 600;
-    text-align: center;
+input[type="text"]#full_name {
+    margin-top: 24px;
+}
+
+input[type="text"]#full_name + input[type="email"] {
+    margin-top: 24px;
 }
 
 input[type="text"],
@@ -469,10 +469,6 @@ button.loading .spinner {
                         value="<?= $e($_SESSION['register_csrf']) ?>"
                     >
 
-                    <label class="field-label" for="full_name">
-                        Student's name
-                    </label>
-
                     <input
                         id="full_name"
                         name="full_name"
@@ -480,13 +476,10 @@ button.loading .spinner {
                         required
                         maxlength="100"
                         autocomplete="name"
+                        aria-label="Student's name"
                         placeholder="Your full name"
                         autofocus
                     >
-
-                    <label class="field-label" for="email">
-                        College email address
-                    </label>
 
                     <input
                         id="email"
@@ -495,6 +488,7 @@ button.loading .spinner {
                         required
                         maxlength="254"
                         autocomplete="email"
+                        aria-label="College email address"
                         placeholder="yourname@heraldcollege.edu.np"
                     >
 
