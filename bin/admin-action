@@ -3278,8 +3278,9 @@ switch ($action) {
                 'area'
             );
 
-        if (!in_array($area, ['workshops', 'exam', 'assessment'], true)) {
-            refuse('Choose Workshops, Exam, or Assessment.');
+        $validWeek = preg_match('/^week(?:1|2|3|4|5|6|8|9|10|11|12)$/', $area) === 1;
+        if (!$validWeek && !in_array($area, ['workshops', 'exam', 'assessment'], true)) {
+            refuse('Choose Workshops, a workshop week, Exam, or Assessment.');
         }
 
         [$code, $out, $err] = run([
