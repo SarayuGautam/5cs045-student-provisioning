@@ -98,6 +98,14 @@ echo "=== student folder layout and access checks ==="
 su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/outside.txt' >/dev/null 2>&1   && bad "student can write directly in their home" || ok "student cannot write directly in their home"
 su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/workshops/outside.txt' >/dev/null 2>&1   && bad "student can write directly in ~/workshops" || ok "student cannot write directly in ~/workshops"
 su - smoketest_a -s /bin/bash -c 'printf ok > /srv/students/smoketest_a/workshops/week1/write-test.txt' >/dev/null 2>&1   && ok "student can write inside an allowed workshop week" || bad "student cannot write inside an allowed workshop week"
+for week in 1 2 3 4 5 6 8 9 10 11 12; do
+  [[ -d "/srv/students/smoketest_a/workshops/week$week" ]] \
+    && ok "week$week workshop folder exists" \
+    || bad "week$week workshop folder is missing"
+done
+[[ ! -d "/srv/students/smoketest_a/workshops/week7" ]] \
+  && ok "week7 is not created" \
+  || bad "week7 should not be a workshop folder"
 "$DEPLOY_ROOT/bin/student-access.sh" set smoketest_a 1 locked 0 locked 0 0 >/dev/null 2>&1   || bad "could not lock Exam and Assessment for folder-access test"
 su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/exam/locked.txt' >/dev/null 2>&1   && bad "student can write to locked Exam folder" || ok "locked Exam folder rejects student writes"
 su - smoketest_a -s /bin/bash -c 'touch /srv/students/smoketest_a/assessment/locked.txt' >/dev/null 2>&1   && bad "student can write to locked Assessment folder" || ok "locked Assessment folder rejects student writes"
@@ -142,7 +150,7 @@ check_code "$BASE_URL/smtp_config.php" "404" "smtp_config.php is not servable ov
 ROOT_PAGE="$("${CURL[@]}" "$STUDENT_URL/~smoketest_a/" 2>/dev/null)"
 [[ "$ROOT_PAGE" == *"Welcome, smoketest_a"* ]] && ok "student root URL shows the welcome page" || bad "student root URL did not show the welcome page"
 FOLDER_PAGE="$("${CURL[@]}" "$STUDENT_URL/~smoketest_b/workshops/" 2>/dev/null)"
-[[ "$FOLDER_PAGE" == *"Use the week folder you were given"* ]] && ok "an empty folder shows its short description" || bad "an empty folder did not show its description"
+[[ "$FOLDER_PAGE" == *"Upload this week"* ]] && ok "an empty folder shows its short description" || bad "an empty folder did not show its description"
 
 echo ""
 echo "=== resource limit checks ==="
