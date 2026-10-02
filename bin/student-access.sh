@@ -149,7 +149,7 @@ set_area_open() {
   # Make the owner's write permission explicit as well as the web server's read/execute
   # access. This repairs directories that previously had an ACL mask or mode left behind
   # by a locked state or an SSH upload.
-  setfacl -m "u:$user:rwx,g:$WEB_GROUP:rx,m::rwx,o::---" "$dir" 2>/dev/null || true
+  setfacl -m "u::rwx,g::r-x,g:$WEB_GROUP:r-x,m::rwx,o::---" "$dir" 2>/dev/null || true
   setfacl -m "d:u::rwx,d:g::r-x,d:g:$WEB_GROUP:r-x,d:m::rwx,d:o::---" "$dir" 2>/dev/null || true
 }
 
