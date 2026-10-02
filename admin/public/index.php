@@ -12,6 +12,33 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path = rtrim((string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH), '/') ?: '/';
 $post = $method === 'POST';
 $USER = '[a-z][a-z0-9_]{2,31}';
+function folder_access_timestamp(string $raw, string $mode, string $label): int {
+    if ($mode !== 'scheduled') {
+        return 0;
+    }
+
+    $raw = trim($raw);
+    if ($raw === '') {
+        throw new ApiError("Choose a date and time for {$label}.");
+    }
+
+    $dt = DateTimeImmutable::createFromFormat(
+        '!Y-m-d\\TH:i',
+        $raw,
+        panel_timezone()
+    );
+    $errors = DateTimeImmutable::getLastErrors();
+
+    if (
+        $dt === false ||
+        (is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))
+    ) {
+        throw new ApiError("The {$label} date and time is not valid.");
+    }
+
+    return $dt->getTimestamp();
+}
+
 $JOB = '\d{8}-\d{6}-[a-f0-9]{6}';
 
 if ($post) {
@@ -168,7 +195,7 @@ try {
         render('server', ['title' => 'Server', 'nav' => 'server', 'health' => api('health'), 'jobs' => api('jobs')]);
     }
 
-    if (preg_match("#^/students/({$USER})/(reset|resend|password|quota|remove)$#", $path, $m) && $post) {
+    if (preg_match("#^/students/({$USER})/(reset|resend|password|quota|folders|remove)$#", $path, $m) && $post) {
         [, $user, $what] = $m;
         $back = "/students/{$user}";
         try {
@@ -199,6 +226,19 @@ try {
                     } else {
                         flash('success', "The disk limit is now " . fmt_mb($r['mb']) . '.');
                     }
+                    break;
+                case 'folders':
+                    $examMode = (string) ($_POST['exam_mode'] ?? 'open');
+                    $assessmentMode = (string) ($_POST['assessment_mode'] ?? 'open');
+                    api('set-folder-access', [
+                        'username' => $user,
+                        'workshop_weeks' => (string) ($_POST['workshop_weeks'] ?? '1'),
+                        'exam_mode' => $examMode,
+                        'exam_at' => (string) folder_access_timestamp((string) ($_POST['exam_at'] ?? ''), $examMode, 'Exam'),
+                        'assessment_mode' => $assessmentMode,
+                        'assessment_at' => (string) folder_access_timestamp((string) ($_POST['assessment_at'] ?? ''), $assessmentMode, 'Assessment')
+                    ]);
+                    flash('success', 'Folder access updated.');
                     break;
                 case 'remove':
                     api('remove-student', ['username' => $user, 'confirm' => trim((string) ($_POST['confirm'] ?? ''))]);

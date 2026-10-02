@@ -244,11 +244,11 @@ Students cannot use `cron` or `at`, because those jobs would run outside the lim
 These steps run on the student's own laptop. The example uses the demo project in this repository and the student `sarayu_gautam`.
 
 ```bash
-# 1. Upload (the "/." puts the files straight into assessment/)
-scp -P 50222 -r demo-student-portfolio-blade/. sarayu_gautam@<server>:~/assessment/
+# 1. Upload into the folder you are using (port 22)
+scp -P 22 -r demo-student-portfolio-blade/. sarayu_gautam@<server>:~/assessment/
 
-# 2. Log in and finish the setup (SSH on this server is on port 50222, not 22)
-ssh -p 50222 sarayu_gautam@<server>
+# 2. Log in and finish the setup
+ssh -p 22 sarayu_gautam@<server>
 cd ~/assessment
 composer install --no-dev
 cp config.example.php config.php
@@ -256,7 +256,7 @@ nano config.php              # your username, password, and username again as th
 mysql -u sarayu_gautam -p sarayu_gautam < schema.sql
 ```
 
-**3. Open it:** `https://fullstack-student.heraldcollege.edu.np/~sarayu_gautam/assessment/`. Anything uploaded is live straight away, with no `chmod` needed. To change the site, edit it on the laptop and run the `scp` command again.
+**3. Open it:** `https://fullstack-student.heraldcollege.edu.np/~sarayu_gautam/assessment/`. The Assessment folder must be open for your student account; Exam and Assessment folders can be locked by the tutor until their scheduled time. Anything uploaded is live straight away, with no `chmod` needed. To change the site, edit it on the laptop and run the `scp` command again.
 
 ## Capacity and hardware
 
@@ -346,7 +346,8 @@ test/admin-panel-e2e.js     Browser test of the admin panel (Playwright)
 test/loadtest/              SSH and SCP load test
 web/                        The student sign-up page and email code
 demo-student-portfolio-blade/  Example website for students
-docs/Server_Access_Guide.docx  Guide for students
+docs/Student_Server_Access_Guide.md  Current guide for students
+
 docs/ADMIN_PANEL_ACCESS.md    Technical admin-role, authentication, and account lifecycle reference
 docs/VAPT-TEST-ACCOUNTS.md    Temporary VAPT/non-student account lifecycle
 ```

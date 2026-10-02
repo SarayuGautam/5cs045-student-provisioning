@@ -3,6 +3,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Every 15 minutes: trim oversized student PHP error logs, cap student databases at 100 MB,
 # and email the admin if the disk is 80% full. See bin/enforce-limits.sh.
 */15 * * * * root /usr/local/sbin/5cs045/bin/enforce-limits.sh
+# Every minute: apply scheduled exam/assessment folder access. See bin/student-access.sh.
+* * * * * root /usr/local/sbin/5cs045/bin/student-access.sh scheduled >/dev/null 2>&1
 # Every minute: restart the login service (systemd-logind) if it has stopped answering,
 # which can happen after hundreds of SSH logins in the same few seconds. See bin/check-logind.sh.
 * * * * * root /usr/local/sbin/5cs045/bin/check-logind.sh

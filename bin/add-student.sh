@@ -77,6 +77,7 @@ chmod 750 "$HOME_DIR"
 
 # The three web folders, readable by the web server, each with a short note page
 "$(dirname "$0")/refresh-student-folders.sh" "$USERNAME" >/dev/null
+"$(dirname "$0")/student-access.sh" set "$USERNAME" 1 locked 0 locked 0 >/dev/null
 
 # Private folders (not served by the web)
 for private in .ssh .sessions; do
